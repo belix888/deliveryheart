@@ -1,0 +1,80 @@
+"use client";
+
+import React, { useState } from "react";
+import Image from "next/image";
+import { Plus, Check } from "lucide-react";
+import { Dish } from "@/types";
+import { useCart } from "@/context/CartContext";
+
+interface DishCardProps {
+  dish: Dish;
+  showRestaurant?: boolean;
+  restaurantName?: string;
+}
+
+const DishCard: React.FC<DishCardProps> = ({
+  dish,
+  showRestaurant = false,
+  restaurantName,
+}) => {
+  const { addToCart } = useCart();
+  const [isAdding, setIsAdding] = useState(false);
+
+  const handleAddToCart = () => {
+    setIsAdding(true);
+    addToCart(dish);
+    setTimeout(() => setIsAdding(false), 400);
+  };
+
+  return (
+    <div className="group bg-white dark:bg-[#2D2A26] rounded-2xl overflow-hidden border border-[#F5F3F0] dark:border-[#3D3A36] card-hover transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 dark:hover:shadow-primary-dark/10">
+      <div className="relative aspect-[3/2] overflow-hidden">
+        <Image
+          src={dish.image}
+          alt={dish.name}
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+      </div>
+      <div className="p-4">
+        {showRestaurant && restaurantName && (
+          <p className="text-xs text-primary dark:text-primary-dark font-medium mb-1">
+            {restaurantName}
+          </p>
+        )}
+        <h4 className="font-display font-semibold text-base mb-1 group-hover:text-primary dark:group-hover:text-primary-dark transition-colors line-clamp-1">
+          {dish.name}
+        </h4>
+        <p className="text-sm text-[#2D2A26]/60 dark:text-[#E8E6E3]/60 mb-3 line-clamp-2">
+          {dish.description}
+        </p>
+        <div className="flex items-center justify-between">
+          <span className="text-lg font-bold text-[#2D2A26] dark:text-[#E8E6E3]">
+            {dish.price} ₽
+          </span>
+          <button
+            onClick={handleAddToCart}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
+              isAdding
+                ? "bg-green-500 text-white pulse-add"
+                : "bg-primary dark:bg-primary-dark text-white hover:opacity-90"
+            }`}
+          >
+            {isAdding ? (
+              <>
+                <Check className="w-4 h-4" />
+                Добавлено
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />В корзину
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DishCard;

@@ -1,0 +1,53 @@
+"use client";
+
+import React from "react";
+import { restaurants } from "@/data";
+import RestaurantCard from "@/components/RestaurantCard";
+
+const FavoritesPage: React.FC = () => {
+  const favoriteRestaurants = restaurants.slice(0, 4);
+
+  return (
+    <div className="animate-fade-in">
+      <div className="px-4 py-4">
+        <h1 className="text-2xl md:text-3xl font-display font-bold mb-6">
+          Избранное
+        </h1>
+
+        {favoriteRestaurants.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {favoriteRestaurants.map((restaurant) => (
+              <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#F5F3F0] dark:bg-[#2D2A26] flex items-center justify-center">
+              <svg
+                className="w-10 h-10 text-[#2D2A26]/30 dark:text-[#E8E6E3]/30"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+            </div>
+            <h2 className="text-xl font-display font-semibold mb-2">
+              Нет избранных
+            </h2>
+            <p className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">
+              Добавляйте заведения в избранное
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default FavoritesPage;

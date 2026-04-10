@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Unbounded:wght@400;500;600;700&display=swap");
+
+:root {
+  --primary: #ff6b35;
+  --primary-dark: #ff8c5a;
+  --secondary: #c41e3a;
+  --secondary-dark: #e83a4d;
+  --background: #fff9f5;
+  --background-dark: #1a1918;
+  --text: #2d2a26;
+  --text-dark: #e8e6e3;
+  --card: #f5f3f0;
+  --card-dark: #2d2a26;
+}
+
+body {
+  font-family: "Manrope", sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+.dark body {
+  background-color: var(--background-dark);
+  color: var(--text-dark);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Unbounded", sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--primary-dark);
+}
+
+/* Animations */
+@keyframes card-hover {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-4px);
+  }
+}
+
+.card-hover:hover {
+  animation: card-hover 0.2s ease-out;
+}
+
+@keyframes pulse-add {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 8px rgba(255, 107, 53, 0.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.pulse-add {
+  animation: pulse-add 0.4s ease-out;
+}
+
+/* Page transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.3s ease-out;
+}
+
+/* Hide scrollbar for horizontal scroll */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Category pill active state */
+.category-pill.active {
+  background-color: var(--primary);
+  color: white;
+}
+
+.dark .category-pill.active {
+  background-color: var(--primary-dark);
+}
+
+/* Rating stars */
+.star-filled {
+  color: #ffd700;
+}
+
+.star-empty {
+  color: #d1d5db;
+}
+
+.dark .star-empty {
+  color: #4b5563;
+}
+
+/* Status badges */
+.status-accepted {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.status-preparing {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.status-onTheWay {
+  background-color: var(--primary);
+  color: white;
+}
+
+.status-delivered {
+  background-color: #10b981;
+  color: white;
+}
