@@ -5,24 +5,31 @@ import Link from "next/link";
 import Image from "next/image";
 import { Star, Clock } from "lucide-react";
 import { Restaurant } from "@/lib/supabase";
+import { RestaurantLogo } from "@/lib/images";
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
 }
 
 const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
-  const imageUrl = restaurant.cover_url || restaurant.logo_url || 'https://images.unsplash.com/photo-1565299624946-b28f40a446ae?w=400&h=300&fit=crop';
+  const hasImage = restaurant.cover_url && restaurant.cover_url.startsWith('http');
   
   return (
     <Link href={`/restaurant/${restaurant.id}`}>
       <div className="group bg-white dark:bg-[#2D2A26] rounded-2xl overflow-hidden border border-[#F5F3F0] dark:border-[#3D3A36] card-hover transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 dark:hover:shadow-primary-dark/10">
         <div className="relative aspect-[4/3] overflow-hidden">
-          <Image
-            src={imageUrl}
-            alt={restaurant.name}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
-          />
+          {hasImage ? (
+            <Image
+              src={restaurant.cover_url}
+              alt={restaurant.name}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="flex items-center justify-center w-full h-full bg-gradient-to-br from-[#FFF3F0] to-[#FFE4E1]">
+              <RestaurantLogo name={restaurant.name} size={120} />
+            </div>
+          )}
         </div>
         <div className="p-4">
           <h4 className="font-display font-semibold text-lg mb-2 group-hover:text-primary dark:group-hover:text-primary-dark transition-colors">

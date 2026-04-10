@@ -15,22 +15,37 @@ interface DishCardProps {
   };
 }
 
+import React, { useState } from "react";
+import Image from "next/image";
+import { Plus, Check } from "lucide-react";
+import { MenuItem } from "@/lib/supabase";
+import { useCart } from "@/context/CartContext";
+import { DishPlaceholder } from "@/lib/images";
+
+interface DishCardProps {
+  dish: MenuItem;
+  restaurant?: {
+    id: string;
+    name: string;
+    delivery_price: number;
+  };
+}
+
 const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
   const { addToCart } = useCart();
   const [isAdding, setIsAdding] = useState(false);
 
-  const imageUrl = dish.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&h=200&fit=crop';
+  const hasImage = dish.image_url && dish.image_url.startsWith('http');
 
   const handleAddToCart = () => {
     setIsAdding(true);
-    // Convert to cart format
     addToCart({
       id: dish.id,
       restaurantId: restaurant?.id || '',
       name: dish.name,
       description: dish.description || '',
       price: Number(dish.price),
-      image: imageUrl,
+      image: dish.image_url || '',
       category: '',
     }, restaurant || null);
     setTimeout(() => setIsAdding(false), 400);
@@ -39,16 +54,22 @@ const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
   return (
     <div className="group bg-white dark:bg-[#2D2A26] rounded-2xl overflow-hidden border border-[#F5F3F0] dark:border-[#3D3A36] card-hover transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 dark:hover:shadow-primary-dark/10">
       <div className="relative aspect-[3/2] overflow-hidden">
-        <Image
-          src={imageUrl}
-          alt={dish.name}
-          fill
-          className="object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+        {hasImage ? (
+          <Image
+            src={dish.image_url}
+            alt={dish.name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <DishPlaceholder name={dish.name} size={400} />
+        )}
         {!dish.is_available && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <span className="text-white font-semibold">Нет в наличии</span>
           </div>
+        )}
+      </div>
         )}
       </div>
       <div className="p-4">
