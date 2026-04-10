@@ -1,36 +1,43 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Star, Clock, ArrowRight } from "lucide-react";
-import { restaurants, categories, getDishesByRestaurant } from "@/data";
-import { Restaurant, Dish } from "@/types";
-import DishCard from "@/components/DishCard";
+import { Search, ArrowRight } from "lucide-react";
+import { fetchRestaurants, Restaurant } from "@/lib/supabase";
 import RestaurantCard from "@/components/RestaurantCard";
 
 const HomePage: React.FC = () => {
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [popularDishes, setPopularDishes] = useState<Dish[]>([]);
 
-  React.useEffect(() => {
-    // Get popular dishes from all restaurants
-    const allDishes = restaurants.flatMap((r) => getDishesByRestaurant(r.id));
-    setPopularDishes(allDishes.slice(0, 6));
+  useEffect(() => {
+    loadRestaurants();
   }, []);
+
+  const loadRestaurants = async () => {
+    setLoading(true);
+    const data = await fetchRestaurants();
+    setRestaurants(data);
+    setLoading(false);
+  };
+
+  const categories = ["Завтраки", "Обеды", "Ужины", "Напитки", "Выпечка"];
 
   const filteredRestaurants = restaurants.filter(
     (r) =>
       r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.cuisines.some((c) =>
-        c.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
+      r.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredByCategory = activeCategory
-    ? popularDishes.filter((d) => d.category === activeCategory)
-    : popularDishes;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
@@ -77,25 +84,13 @@ const HomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <h3 className="text-lg font-display font-semibold mb-4">Категории</h3>
           <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
-            <button
-              onClick={() => setActiveCategory(null)}
-              className={`category-pill flex-shrink-0 px-5 py-2.5 rounded-full font-medium transition-all ${
-                activeCategory === null
-                  ? "active"
-                  : "bg-[#F5F3F0] dark:bg-[#2D2A26] text-[#2D2A26] dark:text-[#E8E6E3] hover:bg-[#E8E6E3] dark:hover:bg-[#3D3A36]"
-              }`}
-            >
+            <button className="category-pill flex-shrink-0 px-5 py-2.5 rounded-full font-medium transition-all bg-primary text-white">
               Все
             </button>
             {categories.map((category) => (
               <button
                 key={category}
-                onClick={() => setActiveCategory(category)}
-                className={`category-pill flex-shrink-0 px-5 py-2.5 rounded-full font-medium transition-all ${
-                  activeCategory === category
-                    ? "active"
-                    : "bg-[#F5F3F0] dark:bg-[#2D2A26] text-[#2D2A26] dark:text-[#E8E6E3] hover:bg-[#E8E6E3] dark:hover:bg-[#3D3A36]"
-                }`}
+                className="category-pill flex-shrink-0 px-5 py-2.5 rounded-full font-medium transition-all bg-[#F5F3F0] dark:bg-[#2D2A26] text-[#2D2A26] dark:text-[#E8E6E3] hover:bg-[#E8E6E3] dark:hover:bg-[#3D3A36]"
               >
                 {category}
               </button>
@@ -104,7 +99,7 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Popular Restaurants */}
+      {/* Restaurants */}
       <section className="py-6 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
@@ -118,29 +113,49 @@ const HomePage: React.FC = () => {
               Все <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {restaurants.slice(0, 6).map((restaurant) => (
-              <RestaurantCard key={restaurant.id} restaurant={restaurant} />
-            ))}
-          </div>
+          
+          {restaurants.length === 0 ? (
+            <div className="text-center py-12 bg-white dark:bg-[#2D2A26] rounded-2xl border border-[#F5F3F0] dark:border-[#3D3A36]">
+              <p className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">
+                Пока нет доступных ресторанов
+              </p>
+              <p className="text-sm text-[#2D2A26]/40 mt-2">
+                Добавьте рестораны в базу данных Supabase
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredRestaurants.slice(0, 6).map((restaurant) => (
+                <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Popular Dishes */}
+      {/* Info Section */}
       <section className="py-6 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-display font-semibold">
-              Популярные блюда
-            </h3>
-            <button className="flex items-center gap-1 text-primary dark:text-primary-dark text-sm font-medium hover:opacity-80">
-              Все <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredByCategory.map((dish) => (
-              <DishCard key={dish.id} dish={dish} />
-            ))}
+          <div className="bg-white dark:bg-[#2D2A26] rounded-2xl p-6 border border-[#F5F3F0] dark:border-[#3D3A36]">
+            <h3 className="text-lg font-display font-semibold mb-4">О сервисе</h3>
+            <p className="text-[#2D2A26]/70 dark:text-[#E8E6E3]/70">
+              «Доставка от души» — это удобный сервис заказа еды из лучших ресторанов вашего города. 
+              Мы объединяем все заведения в одном месте, чтобы вы могли легко найти и заказать любимые блюда.
+            </p>
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-primary dark:text-primary-dark">{restaurants.length}</p>
+                <p className="text-sm text-[#2D2A26]/60">Ресторанов</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-primary dark:text-primary-dark">24/7</p>
+                <p className="text-sm text-[#2D2A26]/60">Работаем</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-primary dark:text-primary-dark">Сураж</p>
+                <p className="text-sm text-[#2D2A26]/60">Город</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

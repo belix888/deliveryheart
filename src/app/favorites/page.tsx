@@ -1,11 +1,38 @@
 "use client";
 
-import React from "react";
-import { restaurants } from "@/data";
+import React, { useState, useEffect } from "react";
+import { fetchRestaurants, fetchFavorites, ensureDemoUser, Restaurant } from "@/lib/supabase";
 import RestaurantCard from "@/components/RestaurantCard";
 
 const FavoritesPage: React.FC = () => {
-  const favoriteRestaurants = restaurants.slice(0, 4);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  const loadFavorites = async () => {
+    setLoading(true);
+    const user = await ensureDemoUser();
+    if (user) {
+      const favs = await fetchFavorites(user.id);
+      setRestaurants(favs);
+    } else {
+      // If no user, just show random restaurants as favorites
+      const all = await fetchRestaurants();
+      setRestaurants(all.slice(0, 4));
+    }
+    setLoading(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
@@ -14,14 +41,14 @@ const FavoritesPage: React.FC = () => {
           Избранное
         </h1>
 
-        {favoriteRestaurants.length > 0 ? (
+        {restaurants.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {favoriteRestaurants.map((restaurant) => (
+            {restaurants.map((restaurant) => (
               <RestaurantCard key={restaurant.id} restaurant={restaurant} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-16">
+          <div className="text-center py-16 bg-white dark:bg-[#2D2A26] rounded-2xl border">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#F5F3F0] dark:bg-[#2D2A26] flex items-center justify-center">
               <svg
                 className="w-10 h-10 text-[#2D2A26]/30 dark:text-[#E8E6E3]/30"
