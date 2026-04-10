@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { CartProvider } from "@/context/CartContext";
+import { AuthProvider } from "@/context/AuthContext";
 import Header from "@/components/Header";
 import MobileNav from "@/components/MobileNav";
 
@@ -20,13 +21,15 @@ export default function RootLayout({
     <html lang="ru">
       <body>
         <ThemeProvider>
-          <CartProvider>
-            <div className="min-h-screen bg-[#FFF9F5] dark:bg-[#1A1918] text-[#2D2A26] dark:text-[#E8E6E3] transition-colors duration-300">
-              <Header />
-              <main className="pb-20 md:pb-4">{children}</main>
-              <MobileNav />
-            </div>
-          </CartProvider>
+          <AuthProvider>
+            <CartProvider>
+              <div className="min-h-screen bg-[#FFF9F5] dark:bg-[#1A1918] text-[#2D2A26] dark:text-[#E8E6E3] transition-colors duration-300">
+                <Header />
+                <main className="pb-20 md:pb-4">{children}</main>
+                <MobileNav />
+              </div>
+            </CartProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
