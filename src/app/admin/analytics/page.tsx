@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { BarChart3, TrendingUp, Users, DollarSign, Orders } from "lucide-react";
+import { BarChart3, TrendingUp, Users, DollarSign, ShoppingCart } from "lucide-react";
 
 const AnalyticsPage = () => {
   return (
@@ -10,7 +10,7 @@ const AnalyticsPage = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { icon: Orders, label: "Заказы сегодня", value: "0", color: "bg-blue-100" },
+          { icon: ShoppingCart, label: "Заказы сегодня", value: "0", color: "bg-blue-100" },
           { icon: DollarSign, label: "Выручка", value: "0 ₽", color: "bg-green-100" },
           { icon: Users, label: "Новые клиенты", value: "0", color: "bg-purple-100" },
           { icon: TrendingUp, label: "Средний чек", value: "0 ₽", color: "bg-orange-100" },
