@@ -4,11 +4,12 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Minus, Plus, MapPin, ArrowLeft, CreditCard, Printer } from "lucide-react";
-import { useCart, CartItem } from "@/context/CartContext";
+import { useCart } from "@/context/CartContext";
 import { supabase, createOrder, Address, fetchAddresses } from "@/lib/supabase";
 
 const CartPage: React.FC = () => {
   const { items, updateQuantity, removeFromCart, total, deliveryPrice, clearCart, restaurant } = useCart();
+  const restaurantName = restaurant?.name || (items[0]?.dish as any)?.restaurantId || '';
   const [address, setAddress] = useState("");
   const [apartment, setApartment] = useState("");
   const [comment, setComment] = useState("");
@@ -99,10 +100,10 @@ const CartPage: React.FC = () => {
         if (items.length > 0 && userId) {
           const orderItems = items.map(item => ({
             order_id: order.id,
-            menu_item_id: item.id,
+            menu_item_id: item.dish.id,
             quantity: item.quantity,
-            price: item.price,
-            total_price: item.price * item.quantity,
+            price: item.dish.price,
+            total_price: item.dish.price * item.quantity,
           }));
           
           await supabase.from('order_items').insert(orderItems);
@@ -185,20 +186,20 @@ const CartPage: React.FC = () => {
       {/* Items */}
       <div className="space-y-4 mb-6">
         {items.map((item) => (
-          <div key={item.id} className="flex gap-4 bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-2xl p-4">
-            {item.image_url && (
+          <div key={item.dish.id} className="flex gap-4 bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-2xl p-4">
+            {item.dish.image && (
               <div className="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0">
-                <Image src={item.image_url} alt={item.name} fill className="object-cover" />
+                <Image src={item.dish.image} alt={item.dish.name} fill className="object-cover" />
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{item.name}</p>
-              <p className="text-sm text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">{item.weight}</p>
-              <p className="font-semibold">{formatPrice(item.price)}</p>
+              <p className="font-medium truncate">{item.dish.name}</p>
+              <p className="text-sm text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">{item.dish.category}</p>
+              <p className="font-semibold">{formatPrice(item.dish.price)}</p>
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                onClick={() => updateQuantity(item.dish.id, item.quantity - 1)}
                 disabled={item.quantity <= 1}
                 className="w-8 h-8 rounded-full bg-[#2D2A26]/10 dark:bg-[#E8E6E3]/10 flex items-center justify-center disabled:opacity-50"
               >
@@ -206,14 +207,14 @@ const CartPage: React.FC = () => {
               </button>
               <span className="w-8 text-center font-medium">{item.quantity}</span>
               <button
-                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                onClick={() => updateQuantity(item.dish.id, item.quantity + 1)}
                 className="w-8 h-8 rounded-full bg-[#2D2A26]/10 dark:bg-[#E8E6E3]/10 flex items-center justify-center"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
             <button
-              onClick={() => removeFromCart(item.id)}
+              onClick={() => removeFromCart(item.dish.id)}
               className="p-2 text-red-400 hover:text-red-600"
             >
               <Trash2 className="w-5 h-5" />

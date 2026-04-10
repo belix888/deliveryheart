@@ -1,17 +1,13 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { CartItem, Dish } from "@/types";
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (dish: Dish) => void;
+  restaurant: any;
+  deliveryPrice: number;
+  addToCart: (dish: Dish, restaurant: any) => void;
   removeFromCart: (dishId: string) => void;
   updateQuantity: (dishId: string, quantity: number) => void;
   clearCart: () => void;
@@ -20,16 +16,19 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export const CartProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [restaurant, setRestaurant] = useState<any>(null);
+  const [deliveryPrice, setDeliveryPrice] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("cart");
     if (saved) {
       try {
-        setItems(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setItems(parsed.items || []);
+        setRestaurant(parsed.restaurant || null);
+        setDeliveryPrice(parsed.deliveryPrice || 0);
       } catch (e) {
         console.error("Error parsing cart", e);
       }
@@ -37,17 +36,26 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(items));
-  }, [items]);
+    localStorage.setItem("cart", JSON.stringify({ items, restaurant, deliveryPrice }));
+  }, [items, restaurant, deliveryPrice]);
 
-  const addToCart = (dish: Dish) => {
+  const addToCart = (dish: Dish, rest: any) => {
+    // Если ресторан другой, очищаем корзину
+    if (restaurant && restaurant.id !== rest.id) {
+      setItems([{ dish, quantity: 1 }]);
+      setRestaurant(rest);
+      setDeliveryPrice(rest.delivery_price || 0);
+      return;
+    }
+    
+    setRestaurant(rest);
+    setDeliveryPrice(rest.delivery_price || 0);
+    
     setItems((prev) => {
       const existing = prev.find((item) => item.dish.id === dish.id);
       if (existing) {
         return prev.map((item) =>
-          item.dish.id === dish.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
+          item.dish.id === dish.id ? { ...item, quantity: item.quantity + 1 } : item,
         );
       }
       return [...prev, { dish, quantity: 1 }];
@@ -55,7 +63,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const removeFromCart = (dishId: string) => {
-    setItems((prev) => prev.filter((item) => item.dish.id !== dishId));
+    const newItems = items.filter((item) => item.dish.id !== dishId);
+    setItems(newItems);
+    if (newItems.length === 0) {
+      setRestaurant(null);
+      setDeliveryPrice(0);
+    }
   };
 
   const updateQuantity = (dishId: string, quantity: number) => {
@@ -70,7 +83,11 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({
     );
   };
 
-  const clearCart = () => setItems([]);
+  const clearCart = () => {
+    setItems([]);
+    setRestaurant(null);
+    setDeliveryPrice(0);
+  };
 
   const total = items.reduce(
     (sum, item) => sum + item.dish.price * item.quantity,
@@ -81,6 +98,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({
     <CartContext.Provider
       value={{
         items,
+        restaurant,
+        deliveryPrice,
         addToCart,
         removeFromCart,
         updateQuantity,
@@ -100,3 +119,6 @@ export const useCart = () => {
   }
   return context;
 };
+
+// Re-export types
+export type { CartItem, Dish } from "@/types";
