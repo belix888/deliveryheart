@@ -163,7 +163,7 @@ const RestaurantPage: React.FC = () => {
                 ? menuItems.filter(item => item.category_id === activeCategory)
                 : menuItems
               ).map((dish) => (
-                <DishCard key={dish.id} dish={dish} />
+                <DishCard key={dish.id} dish={dish} restaurant={restaurant} />
               ))}
             </div>
           </>

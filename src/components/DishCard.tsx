@@ -8,9 +8,14 @@ import { useCart } from "@/context/CartContext";
 
 interface DishCardProps {
   dish: MenuItem;
+  restaurant?: {
+    id: string;
+    name: string;
+    delivery_price: number;
+  };
 }
 
-const DishCard: React.FC<DishCardProps> = ({ dish }) => {
+const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
   const { addToCart } = useCart();
   const [isAdding, setIsAdding] = useState(false);
 
@@ -21,13 +26,13 @@ const DishCard: React.FC<DishCardProps> = ({ dish }) => {
     // Convert to cart format
     addToCart({
       id: dish.id,
-      restaurantId: '',
+      restaurantId: restaurant?.id || '',
       name: dish.name,
       description: dish.description || '',
       price: Number(dish.price),
       image: imageUrl,
       category: '',
-    } as any);
+    }, restaurant || null);
     setTimeout(() => setIsAdding(false), 400);
   };
 
