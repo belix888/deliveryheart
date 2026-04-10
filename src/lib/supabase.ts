@@ -169,12 +169,14 @@ export const fetchAddresses = async (userId: string) => {
 export const createOrder = async (orderData: {
   user_id: string;
   restaurant_id: string;
-  delivery_address_id: string;
+  delivery_address_id: string | null;
   total_amount: number;
   delivery_price: number;
   final_amount: number;
   comment?: string;
 }) => {
+  console.log('createOrder called with:', orderData);
+  
   const { data, error } = await supabase
     .from('orders')
     .insert(orderData)

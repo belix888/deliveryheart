@@ -54,19 +54,27 @@ const CartPage: React.FC = () => {
     setIsOrdering(true);
 
     try {
+      // Получаем userId если есть из AuthContext
+      let currentUserId = userId;
+      if (!currentUserId && user) {
+        currentUserId = user.id;
+      }
+      
       // Создаём адрес если его нет в сохранённых
       let addressId = null;
       
-      // Пробуем найти существующий адрес
-      const existingAddr = savedAddresses.find(a => a.address_text === address);
+      // Пробуем найти существующий адрес (частичное совпадение)
+      const existingAddr = savedAddresses.find(a => 
+        a.address_text?.includes(address) || address?.includes(a.address_text)
+      );
       if (existingAddr) {
         addressId = existingAddr.id;
-      } else if (userId) {
+      } else if (currentUserId) {
         // Создаём новый адрес
         const { data: newAddr } = await supabase
           .from('addresses')
           .insert({
-            user_id: userId,
+            user_id: currentUserId,
             address_text: address,
             apartment: apartment || undefined,
             comment: comment || undefined,
@@ -82,7 +90,7 @@ const CartPage: React.FC = () => {
 
       // Создаём заказ
       const orderData = {
-        user_id: userId || 'demo-user',
+        user_id: currentUserId || user?.id || 'guest',
         restaurant_id: restaurant.id,
         delivery_address_id: addressId,
         total_amount: total,
@@ -91,13 +99,17 @@ const CartPage: React.FC = () => {
         comment: comment || undefined,
       };
 
+      console.log('Creating order with data:', orderData);
+      
       const order = await createOrder(orderData);
+      
+      console.log('Order result:', order);
 
       if (order) {
         setOrderNumber(order.order_number);
         
         // Добавляем позиции заказа
-        if (items.length > 0 && userId) {
+        if (items.length > 0) {
           const orderItems = items.map(item => ({
             order_id: order.id,
             menu_item_id: item.dish.id,
@@ -106,11 +118,13 @@ const CartPage: React.FC = () => {
             total_price: item.dish.price * item.quantity,
           }));
           
+          console.log('Adding order items:', orderItems);
           await supabase.from('order_items').insert(orderItems);
         }
         
         clearCart();
       } else {
+        console.error('Order creation failed - order is null');
         setError("Ошибка при создании заказа. Попробуйте ещё раз.");
         setIsOrdering(false);
       }
