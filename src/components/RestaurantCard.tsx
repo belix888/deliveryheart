@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Star, Clock } from "lucide-react";
 import { Restaurant } from "@/lib/supabase";
-import { RestaurantLogo } from "@/lib/images";
+import { getRestaurantEmoji, getRestaurantPlaceholderStyle } from "@/lib/images";
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -13,6 +13,7 @@ interface RestaurantCardProps {
 
 const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
   const hasImage = restaurant.cover_url && restaurant.cover_url.startsWith('http');
+  const emoji = getRestaurantEmoji(restaurant.name);
   
   return (
     <Link href={`/restaurant/${restaurant.id}`}>
@@ -26,8 +27,8 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="flex items-center justify-center w-full h-full bg-gradient-to-br from-[#FFF3F0] to-[#FFE4E1]">
-              <RestaurantLogo name={restaurant.name} size={120} />
+            <div className="flex items-center justify-center w-full h-full bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20">
+              <span className="text-7xl">{emoji}</span>
             </div>
           )}
         </div>

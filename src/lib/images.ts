@@ -1,7 +1,6 @@
 // src/lib/images.ts
 // Локальные изображения - работают без интернета!
-
-import Image from 'next/image';
+// Используем только функции, без JSX компонентов
 
 // Базовые цвета для категорий
 export const categoryColors: Record<string, string> = {
@@ -62,6 +61,14 @@ export const dishEmojis: Record<string, string> = {
   'лимонад': '🥤',
 };
 
+// Эмодзи для ресторанов
+const restaurantEmojis: Record<string, string> = {
+  'Пельменная': '🥟',
+  'Sushi': '🍣',
+  'Pizza': '🍕',
+  'Napoli': '🍕',
+};
+
 // Получить цвет категории
 export function getCategoryColor(category: string): string {
   return categoryColors[category] || '#F5F5F5';
@@ -81,87 +88,48 @@ export function getDishEmoji(name: string): string {
   return '🍴';
 }
 
-// Компонент для отображения изображения блюда
-interface DishImageProps {
-  name: string;
-  category?: string;
-  size?: number;
-}
-
-export function DishPlaceholder({ name, category, size = 200 }: DishImageProps) {
-  const emoji = getDishEmoji(name) || getCategoryEmoji(category || '');
-  const color = getCategoryColor(category || '');
-  
-  return (
-    <div 
-      className="flex items-center justify-center"
-      style={{
-        width: size,
-        height: size * 0.75,
-        backgroundColor: color,
-        borderRadius: '12px',
-        fontSize: size * 0.4,
-      }}
-    >
-      {emoji}
-    </div>
-  );
-}
-
-// Компонент для логотипа ресторана
-interface RestaurantLogoProps {
-  name: string;
-  size?: number;
-}
-
-const restaurantEmojis: Record<string, string> = {
-  'Пельменная': '🥟',
-  'Sushi': '🍣',
-  'Pizza': '🍕',
-  ' Napoli': '🍕',
-};
-
-export function RestaurantLogo({ name, size = 80 }: RestaurantLogoProps) {
-  let emoji = '🍽️';
-  for (const [key, e] of Object.entries(restaurantEmojis)) {
-    if (name.toLowerCase().includes(key.toLowerCase())) {
-      emoji = e;
-      break;
-    }
+// Получить эмодзи ресторана
+export function getRestaurantEmoji(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, emoji] of Object.entries(restaurantEmojis)) {
+    if (lower.includes(key.toLowerCase())) return emoji;
   }
-  
-  return (
-    <div 
-      className="flex items-center justify-center bg-white rounded-xl shadow-sm"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.5,
-      }}
-    >
-      {emoji}
-    </div>
-  );
+  return '🍽️';
 }
 
-// Дефолтное изображение для ресторана
-export function getDefaultRestaurantImage(slug: string): string {
-  // Используем эмодзи как дефолтное изображение
-  // В реальном приложении здесь будет URL на Supabase Storage
-  return ''; // Пустая строка - будет использован placeholder
+// Функция для получения стилей placeholder блюда
+export function getDishPlaceholderStyle(size: number) {
+  return {
+    width: size,
+    height: size * 0.75,
+    backgroundColor: '#F5F5F5',
+    borderRadius: '12px',
+    fontSize: size * 0.4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
 }
 
-// Функция для получения URL изображения
-export function getImageUrl(table: 'restaurants' | 'menu_items', id: string, field: string = 'image'): string | null {
-  // Позже добавим загрузку в Supabase Storage
-  // Пока возвращает null и используется placeholder
-  return null;
+// Функция для получения стилей placeholder ресторана
+export function getRestaurantPlaceholderStyle(size: number) {
+  return {
+    width: size,
+    height: size,
+    backgroundColor: '#FFF3E0',
+    borderRadius: '12px',
+    fontSize: size * 0.5,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
 }
 
 export default {
   getCategoryColor,
   getCategoryEmoji,
   getDishEmoji,
-  DishPlaceholder,
-  RestaurantLogo,
+  getRestaurantEmoji,
+  getDishPlaceholderStyle,
+  getRestaurantPlaceholderStyle,
 };

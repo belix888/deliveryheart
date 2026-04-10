@@ -20,7 +20,7 @@ import Image from "next/image";
 import { Plus, Check } from "lucide-react";
 import { MenuItem } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
-import { DishPlaceholder } from "@/lib/images";
+import { getDishEmoji, getDishPlaceholderStyle } from "@/lib/images";
 
 interface DishCardProps {
   dish: MenuItem;
@@ -51,6 +51,8 @@ const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
     setTimeout(() => setIsAdding(false), 400);
   };
 
+  const emoji = getDishEmoji(dish.name);
+
   return (
     <div className="group bg-white dark:bg-[#2D2A26] rounded-2xl overflow-hidden border border-[#F5F3F0] dark:border-[#3D3A36] card-hover transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 dark:hover:shadow-primary-dark/10">
       <div className="relative aspect-[3/2] overflow-hidden">
@@ -62,7 +64,12 @@ const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
             className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <DishPlaceholder name={dish.name} size={400} />
+          <div 
+            className="flex items-center justify-center w-full h-full bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20"
+            style={getDishPlaceholderStyle(400)}
+          >
+            <span className="text-6xl">{emoji}</span>
+          </div>
         )}
         {!dish.is_available && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
