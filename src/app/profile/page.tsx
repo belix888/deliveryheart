@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   User,
   Clock,
@@ -15,10 +16,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 import { supabase, fetchUserOrders, fetchAddresses, Order, Address } from "@/lib/supabase";
 
 const ProfilePage: React.FC = () => {
+  const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
+  const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<"orders" | "favorites" | "addresses" | "settings">("orders");
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -258,7 +262,13 @@ const ProfilePage: React.FC = () => {
               </button>
             </div>
             
-            <button className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-2xl flex items-center justify-center gap-2">
+            <button 
+              onClick={async () => {
+                await signOut();
+                router.push('/auth');
+              }}
+              className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-2xl flex items-center justify-center gap-2"
+            >
               <LogOut className="w-5 h-5" />
               Выйти
             </button>
