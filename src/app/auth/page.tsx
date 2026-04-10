@@ -16,6 +16,28 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Функция для форматирования номера телефона
+  const formatPhone = (value: string): string => {
+    // Удаляем все не цифры
+    let digits = value.replace(/\D/g, "");
+    
+    // Если начинается с 9 (после 7 или 8) - добавляем +7
+    if (digits.startsWith("9") && digits.length >= 1) {
+      digits = "7" + digits;
+    }
+    // Если начинается с 8 - заменяем на 7
+    if (digits.startsWith("8") && digits.length >= 1) {
+      digits = "7" + digits.substring(1);
+    }
+    
+    return digits;
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const digits = formatPhone(value);
+    setPhone(digits);
+  };
+
   // Если уже вошёл - редирект
   React.useEffect(() => {
     if (user) {
@@ -87,7 +109,7 @@ export default function AuthPage() {
                   <input
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                     placeholder="+7 (999) 123-45-67"
                     className="w-full pl-12 pr-4 py-4 rounded-xl bg-[#F5F3F0] dark:bg-[#3D3A36] outline-none focus:ring-2 focus:ring-primary text-lg"
                   />
@@ -146,7 +168,7 @@ export default function AuthPage() {
                   <input
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                     placeholder="+7 (999) 123-45-67"
                     className="w-full pl-12 pr-4 py-4 rounded-xl bg-[#F5F3F0] dark:bg-[#3D3A36] outline-none focus:ring-2 focus:ring-primary text-lg"
                   />
