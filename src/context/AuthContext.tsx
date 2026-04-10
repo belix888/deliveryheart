@@ -87,6 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .insert({
           phone,
           full_name: name,
+          email: `${phone}@phone.local`, // Временный email для БД
           role: "user",
           is_verified: true,
         })
