@@ -10,6 +10,30 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ТАБЛИЦЫ
 -- =====================================================
 
+-- 0. Города (NEW!)
+CREATE TABLE IF NOT EXISTS cities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    region VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 0. Промокоды (NEW!)
+CREATE TABLE IF NOT EXISTS coupons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(20) UNIQUE NOT NULL,
+    description TEXT,
+    discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('fixed', 'percent')),
+    discount_value NUMERIC(10,2) NOT NULL,
+    min_order_amount NUMERIC(10,2) DEFAULT 0,
+    max_uses INTEGER,
+    used_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    valid_to TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 1. Пользователи
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -45,12 +69,12 @@ CREATE TABLE IF NOT EXISTS restaurants (
     address TEXT NOT NULL,
     phone VARCHAR(20),
     working_hours JSONB DEFAULT '{"monday": "09:00-21:00", "tuesday": "09:00-21:00", "wednesday": "09:00-21:00", "thursday": "09:00-21:00", "friday": "09:00-22:00", "saturday": "10:00-22:00", "sunday": "10:00-21:00"}',
-    rating DECIMAL(3,2) DEFAULT 0,
+    rating NUMERIC(3,2) DEFAULT 0,
     review_count INTEGER DEFAULT 0,
     delivery_time_min INTEGER DEFAULT 30,
     delivery_time_max INTEGER DEFAULT 45,
-    delivery_price DECIMAL(10,2) DEFAULT 0,
-    min_order DECIMAL(10,2) DEFAULT 500,
+    delivery_price NUMERIC(10,2) DEFAULT 0,
+    min_order NUMERIC(10,2) DEFAULT 500,
     is_active BOOLEAN DEFAULT TRUE,
     city VARCHAR(100) DEFAULT 'Сураж',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -72,7 +96,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
     category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    price DECIMAL(10,2) NOT NULL,
+    price NUMERIC(10,2) NOT NULL,
     image_url TEXT,
     weight VARCHAR(50),
     is_available BOOLEAN DEFAULT TRUE,
@@ -92,9 +116,9 @@ CREATE TABLE IF NOT EXISTS orders (
     restaurant_id UUID NOT NULL REFERENCES restaurants(id),
     status order_status DEFAULT 'pending',
     delivery_address_id UUID REFERENCES addresses(id),
-    total_amount DECIMAL(10,2) DEFAULT 0,
-    delivery_price DECIMAL(10,2) DEFAULT 0,
-    final_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount NUMERIC(10,2) DEFAULT 0,
+    delivery_price NUMERIC(10,2) DEFAULT 0,
+    final_amount NUMERIC(10,2) DEFAULT 0,
     comment TEXT,
     estimated_time TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -108,8 +132,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     menu_item_id UUID NOT NULL REFERENCES menu_items(id),
     quantity INTEGER NOT NULL DEFAULT 1,
-    price DECIMAL(10,2) NOT NULL,
-    total_price DECIMAL(10,2) NOT NULL,
+    price NUMERIC(10,2) NOT NULL,
+    total_price NUMERIC(10,2) NOT NULL,
     note TEXT
 );
 
@@ -395,11 +419,11 @@ CREATE TRIGGER trigger_auto_confirm_order
 -- REALTIME (для отслеживания статусов заказов)
 -- =====================================================
 
--- Включаем realtime для таблицы orders
-ALTER TABLE orders ENABLE REPLICA IDENTITY FULL;
+-- Включаем logical replication для таблицы orders
+ALTER TABLE orders REPLICA IDENTITY FULL;
 
--- Создаем публикацию для realtime
-CREATE PUBLICATION IF NOT EXISTS orders_realtime FOR TABLE orders;
+-- Создаем публикацию для realtime (раскомментируйте если нужен realtime)
+-- CREATE PUBLICATION IF NOT EXISTS orders_realtime FOR TABLE orders;
 
 -- =====================================================
 -- НАЧАЛЬНЫЕ ДАННЫЕ (SEED DATA)

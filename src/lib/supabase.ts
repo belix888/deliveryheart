@@ -56,6 +56,18 @@ export interface Order {
   created_at: string;
 }
 
+export interface Address {
+  id: string;
+  user_id: string;
+  address_text: string;
+  apartment?: string;
+  entrance?: string;
+  floor?: string;
+  comment?: string;
+  is_default: boolean;
+  created_at: string;
+}
+
 // Fetch restaurants
 export const fetchRestaurants = async (): Promise<Restaurant[]> => {
   const { data, error } = await supabase

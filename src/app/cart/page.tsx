@@ -1,30 +1,149 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Trash2, Minus, Plus, MapPin, ArrowLeft } from "lucide-react";
-import { useCart } from "@/context/CartContext";
+import { Trash2, Minus, Plus, MapPin, ArrowLeft, CreditCard, Printer } from "lucide-react";
+import { useCart, CartItem } from "@/context/CartContext";
+import { supabase, createOrder, Address, fetchAddresses } from "@/lib/supabase";
 
 const CartPage: React.FC = () => {
-  const { items, updateQuantity, removeFromCart, total, clearCart } = useCart();
+  const { items, updateQuantity, removeFromCart, total, deliveryPrice, clearCart, restaurant } = useCart();
   const [address, setAddress] = useState("");
+  const [apartment, setApartment] = useState("");
+  const [comment, setComment] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleOrder = () => {
+  useEffect(() => {
+    loadAddresses();
+  }, []);
+
+  const loadAddresses = async () => {
+    const { data: users } = await supabase.from('users').select('id').limit(1);
+    if (users && users.length > 0) {
+      const uid = users[0].id;
+      setUserId(uid);
+      const addrs = await fetchAddresses(uid);
+      setSavedAddresses(addrs);
+      
+      // Автозаполнение дефолтного адреса
+      const defaultAddr = addrs.find(a => a.is_default);
+      if (defaultAddr) {
+        setAddress(defaultAddr.address_text);
+      }
+    }
+  };
+
+  const handleOrder = async () => {
     if (!address) {
-      alert("Пожалуйста, укажите адрес доставки");
+      setError("Пожалуйста, укажите адрес доставки");
       return;
     }
+    
+    if (!restaurant) {
+      setError("Выберите ресторан");
+      return;
+    }
+
+    setError(null);
     setIsOrdering(true);
-    setTimeout(() => {
-      clearCart();
-      alert(
-        "Заказ оформлен! Номер заказа: #" + Math.floor(Math.random() * 10000),
-      );
-      window.location.href = "/order";
-    }, 1000);
+
+    try {
+      // Создаём адрес если его нет в сохранённых
+      let addressId = null;
+      
+      // Пробуем найти существующий адрес
+      const existingAddr = savedAddresses.find(a => a.address_text === address);
+      if (existingAddr) {
+        addressId = existingAddr.id;
+      } else if (userId) {
+        // Создаём новый адрес
+        const { data: newAddr } = await supabase
+          .from('addresses')
+          .insert({
+            user_id: userId,
+            address_text: address,
+            apartment: apartment || undefined,
+            comment: comment || undefined,
+            is_default: savedAddresses.length === 0,
+          })
+          .select()
+          .single();
+        
+        if (newAddr) {
+          addressId = newAddr.id;
+        }
+      }
+
+      // Создаём заказ
+      const orderData = {
+        user_id: userId || 'demo-user',
+        restaurant_id: restaurant.id,
+        delivery_address_id: addressId,
+        total_amount: total,
+        delivery_price: deliveryPrice,
+        final_amount: total + deliveryPrice,
+        comment: comment || undefined,
+      };
+
+      const order = await createOrder(orderData);
+
+      if (order) {
+        setOrderNumber(order.order_number);
+        
+        // Добавляем позиции заказа
+        if (items.length > 0 && userId) {
+          const orderItems = items.map(item => ({
+            order_id: order.id,
+            menu_item_id: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            total_price: item.price * item.quantity,
+          }));
+          
+          await supabase.from('order_items').insert(orderItems);
+        }
+        
+        clearCart();
+      } else {
+        setError("Ошибка при создании заказа. Попробуйте ещё раз.");
+        setIsOrdering(false);
+      }
+    } catch (err) {
+      console.error('Order error:', err);
+      setError("Произошла ошибка. Попробуйте ещё раз.");
+      setIsOrdering(false);
+    }
   };
+
+  // Успешный заказ
+  if (orderNumber) {
+    return (
+      <div className="animate-fade-in px-4 py-8">
+        <div className="text-center py-12">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
+            <Printer className="w-10 h-10 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-display font-bold mb-2">Заказ оформлен!</h2>
+          <p className="text-[#2D2A26]/60 mb-2">Спасибо за заказ</p>
+          <p className="text-3xl font-bold mb-6">#{orderNumber}</p>
+          <p className="text-sm text-[#2D2A26]/60 mb-8">
+            Мы отправим уведомление, когда заказ будет готов
+          </p>
+          <Link
+            href="/"
+            className="inline-block px-6 py-3 bg-primary dark:bg-primary-dark text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+          >
+            Вернуться на главную
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -50,130 +169,150 @@ const CartPage: React.FC = () => {
     );
   }
 
-  return (
-    <div className="animate-fade-in">
-      <div className="px-4 py-4">
-        <div className="flex items-center gap-2 mb-6">
-          <Link
-            href="/"
-            className="p-2 rounded-full hover:bg-[#F5F3F0] dark:hover:bg-[#2D2A26] transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-[#2D2A26] dark:text-[#E8E6E3]" />
-          </Link>
-          <h1 className="text-2xl md:text-3xl font-display font-bold">
-            Корзина
-          </h1>
-        </div>
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('ru-RU').format(price) + ' ₽';
+  };
 
-        {/* Cart Items */}
-        <div className="space-y-4 mb-6">
-          {items.map((item) => (
-            <div
-              key={item.dish.id}
-              className="flex gap-4 bg-white dark:bg-[#2D2A26] rounded-2xl p-4 border border-[#F5F3F0] dark:border-[#3D3A36]"
-            >
-              <div className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden">
-                <Image
-                  src={item.dish.image}
-                  alt={item.dish.name}
-                  fill
-                  className="object-cover"
-                />
+  return (
+    <div className="animate-fade-in px-4 py-8">
+      <Link href={restaurant ? `/restaurant/${restaurant.id}` : "/"} className="flex items-center gap-2 mb-6 text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">
+        <ArrowLeft className="w-4 h-4" />
+        {restaurant ? restaurant.name : "Назад"}
+      </Link>
+
+      <h1 className="text-2xl font-display font-bold mb-6">Корзина</h1>
+
+      {/* Items */}
+      <div className="space-y-4 mb-6">
+        {items.map((item) => (
+          <div key={item.id} className="flex gap-4 bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-2xl p-4">
+            {item.image_url && (
+              <div className="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0">
+                <Image src={item.image_url} alt={item.name} fill className="object-cover" />
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold mb-1 truncate">
-                  {item.dish.name}
-                </h3>
-                <p className="text-sm text-[#2D2A26]/60 dark:text-[#E8E6E3]/60 mb-2">
-                  {item.dish.price} ₽
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-[#F5F3F0] dark:bg-[#3D3A36] rounded-full p-1">
-                    <button
-                      onClick={() =>
-                        updateQuantity(item.dish.id, item.quantity - 1)
-                      }
-                      className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-[#2D2A26] transition-colors"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="w-8 text-center font-semibold">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() =>
-                        updateQuantity(item.dish.id, item.quantity + 1)
-                      }
-                      className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-[#2D2A26] transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <span className="font-bold text-primary dark:text-primary-dark">
-                    {item.dish.price * item.quantity} ₽
-                  </span>
-                </div>
-              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{item.name}</p>
+              <p className="text-sm text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">{item.weight}</p>
+              <p className="font-semibold">{formatPrice(item.price)}</p>
+            </div>
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => removeFromCart(item.dish.id)}
-                className="self-start p-2 text-[#2D2A26]/40 hover:text-secondary dark:hover:text-secondary-dark transition-colors"
+                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                disabled={item.quantity <= 1}
+                className="w-8 h-8 rounded-full bg-[#2D2A26]/10 dark:bg-[#E8E6E3]/10 flex items-center justify-center disabled:opacity-50"
               >
-                <Trash2 className="w-5 h-5" />
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="w-8 text-center font-medium">{item.quantity}</span>
+              <button
+                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                className="w-8 h-8 rounded-full bg-[#2D2A26]/10 dark:bg-[#E8E6E3]/10 flex items-center justify-center"
+              >
+                <Plus className="w-4 h-4" />
               </button>
             </div>
-          ))}
-        </div>
-
-        {/* Address */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">
-            Адрес доставки
-          </label>
-          <div className="relative">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40 dark:text-[#E8E6E3]/40" />
-            <input
-              type="text"
-              placeholder="Улица, дом, квартира"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 rounded-xl bg-white dark:bg-[#2D2A26] border border-[#F5F3F0] dark:border-[#3D3A36] focus:border-primary dark:focus:border-primary-dark focus:outline-none transition-colors"
-            />
+            <button
+              onClick={() => removeFromCart(item.id)}
+              className="p-2 text-red-400 hover:text-red-600"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
           </div>
-        </div>
-
-        {/* Total */}
-        <div className="bg-white dark:bg-[#2D2A26] rounded-2xl p-4 border border-[#F5F3F0] dark:border-[#3D3A36] mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[#2D2A26]/70 dark:text-[#E8E6E3]/70">
-              Сумма заказа
-            </span>
-            <span className="font-semibold">{total} ₽</span>
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[#2D2A26]/70 dark:text-[#E8E6E3]/70">
-              Доставка
-            </span>
-            <span className="font-semibold text-green-500">Бесплатно</span>
-          </div>
-          <div className="border-t border-[#F5F3F0] dark:border-[#3D3A36] pt-2 mt-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">Итого</span>
-              <span className="text-2xl font-bold text-primary dark:text-primary-dark">
-                {total} ₽
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Order Button */}
-        <button
-          onClick={handleOrder}
-          disabled={isOrdering}
-          className="w-full py-4 bg-primary dark:bg-primary-dark text-white font-bold text-lg rounded-2xl hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {isOrdering ? "Оформление..." : "Оформить заказ"}
-        </button>
+        ))}
       </div>
+
+      {/* Address */}
+      <div className="mb-6">
+        <h2 className="font-semibold mb-3">Адрес доставки</h2>
+        
+        {savedAddresses.length > 0 && (
+          <div className="mb-3 space-y-2">
+            {savedAddresses.map(addr => (
+              <button
+                key={addr.id}
+                onClick={() => setAddress(addr.address_text)}
+                className={`w-full text-left p-3 rounded-xl border-2 transition-colors ${
+                  address === addr.address_text
+                    ? "border-primary dark:border-primary-dark bg-primary/5"
+                    : "border-transparent bg-[#F5F3F0] dark:bg-[#2D2A26]"
+                }`}
+              >
+                <MapPin className="w-4 h-4 inline mr-2" />
+                {addr.address_text}
+                {addr.apartment && <span className="text-sm ml-2">кв. {addr.apartment}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+        
+        <input
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Улица, дом, подъезд"
+          className="w-full p-4 rounded-xl bg-[#F5F3F0] dark:bg-[#2D2A26] border-2 border-transparent focus:border-primary dark:focus:border-primary-dark outline-none"
+        />
+        
+        <div className="flex gap-3 mt-3">
+          <input
+            type="text"
+            value={apartment}
+            onChange={(e) => setApartment(e.target.value)}
+            placeholder="Квартира"
+            className="flex-1 p-4 rounded-xl bg-[#F5F3F0] dark:bg-[#2D2A26] border-2 border-transparent focus:border-primary dark:focus:border-primary-dark outline-none"
+          />
+          <input
+            type="text"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Комментарий"
+            className="flex-1 p-4 rounded-xl bg-[#F5F3F0] dark:bg-[#2D2A26] border-2 border-transparent focus:border-primary dark:focus:border-primary-dark outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl">
+          {error}
+        </div>
+      )}
+
+      {/* Total */}
+      <div className="bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-2xl p-4 space-y-2">
+        <div className="flex justify-between">
+          <span className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">Товары</span>
+          <span>{formatPrice(total)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">Доставка</span>
+          <span>{deliveryPrice > 0 ? formatPrice(deliveryPrice) : "Бесплатно"}</span>
+        </div>
+        <div className="flex justify-between text-lg font-bold pt-2 border-t border-[#2D2A26]/10">
+          <span>Итого</span>
+          <span>{formatPrice(total + deliveryPrice)}</span>
+        </div>
+      </div>
+
+      {/* Order Button */}
+      <button
+        onClick={handleOrder}
+        disabled={isOrdering}
+        className="w-full mt-6 py-4 bg-primary dark:bg-primary-dark text-white font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        {isOrdering ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Оформление...
+          </>
+        ) : (
+          <>
+            <CreditCard className="w-5 h-5" />
+            Оформить заказ
+          </>
+        )}
+      </button>
     </div>
   );
 };
