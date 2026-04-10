@@ -28,27 +28,44 @@ const ProfilePage: React.FC = () => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("Гость");
+  const [userPhone, setUserPhone] = useState<string>("");
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
     setLoading(true);
     
-    // Пробуем получить demo пользователя
-    const { data: users } = await supabase.from('users').select('id').limit(1);
-    if (users && users.length > 0) {
-      const uid = users[0].id;
-      setUserId(uid);
+    // Используем user из AuthContext
+    if (user) {
+      setUserId(user.id);
+      setUserName(user.full_name || "Без имени");
+      setUserPhone(user.phone || "");
       
       // Загружаем заказы
-      const userOrders = await fetchUserOrders(uid);
+      const userOrders = await fetchUserOrders(user.id);
       setOrders(userOrders);
       
       // Загружаем адреса
-      const userAddresses = await fetchAddresses(uid);
+      const userAddresses = await fetchAddresses(user.id);
       setAddresses(userAddresses);
+    } else {
+      // Пробуем получить demo пользователя
+      const { data: users } = await supabase.from('users').select('id,full_name,phone').limit(1);
+      if (users && users.length > 0) {
+        const firstUser = users[0];
+        setUserId(firstUser.id);
+        setUserName(firstUser.full_name || "Без имени");
+        setUserPhone(firstUser.phone || "");
+        
+        const userOrders = await fetchUserOrders(firstUser.id);
+        setOrders(userOrders);
+        
+        const userAddresses = await fetchAddresses(firstUser.id);
+        setAddresses(userAddresses);
+      }
     }
     setLoading(false);
   };
@@ -108,9 +125,9 @@ const ProfilePage: React.FC = () => {
           <User className="w-8 h-8 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-bold">Мой профиль</h1>
+          <h1 className="text-xl font-display font-bold">{userName}</h1>
           <p className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">
-            {userId ? 'Зарегистрирован' : 'Гость'}
+            {userPhone || (userId ? 'Зарегистрирован' : 'Гость')}
           </p>
         </div>
       </div>
