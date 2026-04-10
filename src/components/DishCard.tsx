@@ -77,8 +77,6 @@ const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
           </div>
         )}
       </div>
-        )}
-      </div>
       <div className="p-4">
         <h4 className="font-display font-semibold text-base mb-1 group-hover:text-primary dark:group-hover:text-primary-dark transition-colors line-clamp-1">
           {dish.name}
