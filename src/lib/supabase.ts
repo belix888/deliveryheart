@@ -179,12 +179,13 @@ export const fetchAddresses = async (userId: string) => {
 
 // Create order
 export const createOrder = async (orderData: {
+  order_number: string;
   user_id: string;
   restaurant_id: string;
-  delivery_address_id: string | null;
   total_amount: number;
   delivery_price: number;
   final_amount: number;
+  status: string;
   comment?: string;
 }) => {
   console.log('createOrder called with:', JSON.stringify(orderData, null, 2));
