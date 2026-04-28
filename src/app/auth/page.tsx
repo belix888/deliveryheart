@@ -94,7 +94,7 @@ export default function AuthPage() {
             <span className="text-white text-2xl">❤️</span>
           </div>
           <h1 className="text-2xl font-display font-bold">Доставка от души</h1>
-          <p className="text-[#2D2A26]/60 mt-2">
+          <p className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60 mt-2">
             {mode === "register" ? "Создайте аккаунт" : "Войдите по номеру телефона"}
           </p>
         </div>
@@ -105,7 +105,7 @@ export default function AuthPage() {
               <div className="mb-6">
                 <label className="block text-sm font-medium mb-2">Номер телефона</label>
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40" />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40 dark:text-[#E8E6E3]/40" />
                   <input
                     type="tel"
                     value={phone}
@@ -150,7 +150,7 @@ export default function AuthPage() {
               <div className="mb-6">
                 <label className="block text-sm font-medium mb-2">Ваше имя</label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40 dark:text-[#E8E6E3]/40" />
                   <input
                     type="text"
                     value={name}
@@ -164,7 +164,7 @@ export default function AuthPage() {
               <div className="mb-6">
                 <label className="block text-sm font-medium mb-2">Номер телефона</label>
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40" />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40 dark:text-[#E8E6E3]/40" />
                   <input
                     type="tel"
                     value={phone}
@@ -196,7 +196,7 @@ export default function AuthPage() {
               <div className="mt-4 text-center">
                 <button
                   onClick={() => setMode("phone")}
-                  className="text-[#2D2A26]/60 text-sm"
+                  className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60 text-sm"
                 >
                   <ArrowLeft className="w-4 h-4 inline mr-1" />
                   Назад
@@ -206,7 +206,7 @@ export default function AuthPage() {
           )}
         </div>
 
-        <p className="text-center text-sm text-[#2D2A26]/40 mt-6">
+        <p className="text-center text-sm text-[#2D2A26]/40 dark:text-[#E8E6E3]/40 mt-6">
           Продолжая, вы соглашаетесь с условиями использования
         </p>
       </div>

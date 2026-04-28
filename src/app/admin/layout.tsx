@@ -124,7 +124,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 {isDark ? (
                   <Sun className="w-5 h-5 text-primary-dark" />
                 ) : (
-                  <Moon className="w-5 h-5 text-[#2D2A26]" />
+                  <Moon className="w-5 h-5 text-[#2D2A26] dark:text-[#E8E6E3]" />
                 )}
               </button>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-full">

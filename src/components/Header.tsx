@@ -37,7 +37,7 @@ const Header: React.FC = () => {
               {isDark ? (
                 <Sun className="w-5 h-5 text-primary-dark" />
               ) : (
-                <Moon className="w-5 h-5 text-[#2D2A26]" />
+                <Moon className="w-5 h-5 text-[#2D2A26] dark:text-[#E8E6E3]" />
               )}
             </button>
 
