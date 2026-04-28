@@ -52,20 +52,12 @@ const ProfilePage: React.FC = () => {
       const userAddresses = await fetchAddresses(user.id);
       setAddresses(userAddresses);
     } else {
-      // Пробуем получить demo пользователя
-      const { data: users } = await supabase.from('users').select('id,full_name,phone').limit(1);
-      if (users && users.length > 0) {
-        const firstUser = users[0];
-        setUserId(firstUser.id);
-        setUserName(firstUser.full_name || "Без имени");
-        setUserPhone(firstUser.phone || "");
-        
-        const userOrders = await fetchUserOrders(firstUser.id);
-        setOrders(userOrders);
-        
-        const userAddresses = await fetchAddresses(firstUser.id);
-        setAddresses(userAddresses);
-      }
+      // Не авторизован - показываем пустой профиль гостя
+      setUserId(null);
+      setUserName("Гость");
+      setUserPhone("");
+      setOrders([]);
+      setAddresses([]);
     }
     setLoading(false);
   };
@@ -129,6 +121,14 @@ const ProfilePage: React.FC = () => {
           <p className="text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">
             {userPhone || (userId ? 'Зарегистрирован' : 'Гость')}
           </p>
+          {!userId && (
+            <Link 
+              href="/auth" 
+              className="mt-2 inline-block text-sm text-primary dark:text-primary-dark font-medium"
+            >
+              Войти или зарегистрироваться
+            </Link>
+          )}
         </div>
       </div>
 
