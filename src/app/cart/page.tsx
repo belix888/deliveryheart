@@ -90,13 +90,18 @@ const CartPage: React.FC = () => {
       }
 
       // Создаём заказ
+      // Генерируем уникальный номер заказа
+      const orderNumber = Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      
       const orderData = {
+        order_number: orderNumber,
         user_id: user.id,
         restaurant_id: restaurant.id,
         delivery_address_id: addressId,
         total_amount: total,
         delivery_price: deliveryPrice,
         final_amount: total + deliveryPrice,
+        status: 'pending',
       };
 
       console.log('Creating order with data:', orderData);
