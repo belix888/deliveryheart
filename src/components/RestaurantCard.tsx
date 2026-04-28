@@ -24,6 +24,8 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
               src={restaurant.cover_url}
               alt={restaurant.name}
               fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              priority={false}
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (

@@ -83,6 +83,21 @@ export const fetchRestaurants = async (): Promise<Restaurant[]> => {
   return data || [];
 };
 
+// Fetch single restaurant by ID
+export const fetchRestaurantById = async (restaurantId: string): Promise<Restaurant | null> => {
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('*')
+    .eq('id', restaurantId)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching restaurant:', error);
+    return null;
+  }
+  return data;
+};
+
 // Fetch categories for restaurant
 export const fetchCategories = async (restaurantId: string): Promise<Category[]> => {
   const { data, error } = await supabase
@@ -117,22 +132,19 @@ export const fetchMenuItems = async (categoryId: string): Promise<MenuItem[]> =>
 
 // Fetch all menu items for restaurant
 export const fetchRestaurantMenu = async (restaurantId: string): Promise<MenuItem[]> => {
-  const { data, error } = await supabase
-    .from('menu_items')
-    .select('*')
-    .eq('category_id', `category_${restaurantId}`);
-  
   // Get categories first
   const categories = await fetchCategories(restaurantId);
   
-  let allItems: MenuItem[] = [];
-  
-  for (const category of categories) {
-    const items = await fetchMenuItems(category.id);
-    allItems = [...allItems, ...items];
+  if (categories.length === 0) {
+    return [];
   }
   
-  return allItems;
+  // Use Promise.all for parallel fetching instead of sequential
+  const menuItemsArrays = await Promise.all(
+    categories.map(category => fetchMenuItems(category.id))
+  );
+  
+  return menuItemsArrays.flat();
 };
 
 // Fetch user by ID

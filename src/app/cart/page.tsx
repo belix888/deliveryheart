@@ -9,7 +9,6 @@ import { supabase, createOrder, Address, fetchAddresses } from "@/lib/supabase";
 
 const CartPage: React.FC = () => {
   const { items, updateQuantity, removeFromCart, total, deliveryPrice, clearCart, restaurant } = useCart();
-  const restaurantName = restaurant?.name || (items[0]?.dish as any)?.restaurantId || '';
   const [address, setAddress] = useState("");
   const [apartment, setApartment] = useState("");
   const [comment, setComment] = useState("");
@@ -56,8 +55,8 @@ const CartPage: React.FC = () => {
     try {
       // Получаем userId если есть из AuthContext
       let currentUserId = userId;
-      if (!currentUserId && user) {
-        currentUserId = user.id;
+      if (!currentUserId) {
+        currentUserId = 'guest';
       }
       
       // Создаём адрес если его нет в сохранённых
@@ -90,7 +89,7 @@ const CartPage: React.FC = () => {
 
       // Создаём заказ
       const orderData = {
-        user_id: currentUserId || user?.id || 'guest',
+        user_id: currentUserId || 'guest',
         restaurant_id: restaurant.id,
         delivery_address_id: addressId,
         total_amount: total,
@@ -203,7 +202,7 @@ const CartPage: React.FC = () => {
           <div key={item.dish.id} className="flex gap-4 bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-2xl p-4">
             {item.dish.image && (
               <div className="w-16 h-16 rounded-xl overflow-hidden relative flex-shrink-0">
-                <Image src={item.dish.image} alt={item.dish.name} fill className="object-cover" />
+                <Image src={item.dish.image} alt={item.dish.name} fill sizes="64px" className="object-cover" />
               </div>
             )}
             <div className="flex-1 min-w-0">

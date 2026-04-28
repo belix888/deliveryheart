@@ -28,7 +28,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
     } else if (saved === "light") {
       setIsDark(false);
       document.documentElement.classList.remove("dark");
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    } else if (typeof window !== 'undefined' && window.matchMedia("(prefers-color-scheme: dark)").matches) {
       setIsDark(true);
       document.documentElement.classList.add("dark");
     }

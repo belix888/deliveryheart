@@ -5,21 +5,6 @@ import Image from "next/image";
 import { Plus, Check } from "lucide-react";
 import { MenuItem } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
-
-interface DishCardProps {
-  dish: MenuItem;
-  restaurant?: {
-    id: string;
-    name: string;
-    delivery_price: number;
-  };
-}
-
-import React, { useState } from "react";
-import Image from "next/image";
-import { Plus, Check } from "lucide-react";
-import { MenuItem } from "@/lib/supabase";
-import { useCart } from "@/context/CartContext";
 import { getDishEmoji, getDishPlaceholderStyle } from "@/lib/images";
 
 interface DishCardProps {
@@ -61,6 +46,8 @@ const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
             src={dish.image_url}
             alt={dish.name}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            priority={false}
             className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (

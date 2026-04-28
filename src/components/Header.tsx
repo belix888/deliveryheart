@@ -9,9 +9,10 @@ import { useCart } from "@/context/CartContext";
 
 const Header: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
-  const { total } = useCart();
+  const { items } = useCart();
   const pathname = usePathname();
 
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const isActive = (path: string) => pathname === path;
 
   return (
@@ -45,9 +46,9 @@ const Header: React.FC = () => {
               className="relative p-2 rounded-full hover:bg-[#F5F3F0] dark:hover:bg-[#2D2A26] transition-colors"
             >
               <ShoppingCart className="w-5 h-5 text-[#2D2A26] dark:text-[#E8E6E3]" />
-              {total > 0 && (
+              {itemCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-secondary dark:bg-secondary-dark text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {total > 999 ? "999+" : total}
+                  {itemCount > 999 ? "999+" : itemCount}
                 </span>
               )}
             </Link>

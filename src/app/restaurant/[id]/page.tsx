@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Star, Clock, MapPin, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { fetchRestaurants, fetchCategories, fetchMenuItems, Restaurant, Category, MenuItem } from "@/lib/supabase";
+import { fetchRestaurants, fetchRestaurantById, fetchRestaurantMenu, fetchCategories, fetchMenuItems, Restaurant, Category, MenuItem } from "@/lib/supabase";
 import DishCard from "@/components/DishCard";
 
 const RestaurantPage: React.FC = () => {
@@ -25,22 +25,21 @@ const RestaurantPage: React.FC = () => {
   const loadRestaurantData = async () => {
     setLoading(true);
     
-    // Fetch restaurant
-    const restaurants = await fetchRestaurants();
-    const found = restaurants.find(r => r.id === restaurantId);
-    setRestaurant(found || null);
+    // Fetch single restaurant by ID instead of all restaurants
+    const restaurant = await fetchRestaurantById(restaurantId);
+    setRestaurant(restaurant);
     
-    if (found) {
+    if (restaurant) {
       // Fetch categories
       const cats = await fetchCategories(restaurantId);
       setCategories(cats);
       
-      // Fetch all menu items
-      let allItems: MenuItem[] = [];
-      for (const cat of cats) {
-        const items = await fetchMenuItems(cat.id);
-        allItems = [...allItems, ...items.map(item => ({ ...item, category_name: cat.name }))];
-      }
+      // Fetch all menu items using optimized function
+      const menu = await fetchRestaurantMenu(restaurantId);
+      const allItems = menu.map(item => {
+        const cat = cats.find(c => c.id === item.category_id);
+        return { ...item, category_name: cat?.name || '' };
+      });
       setMenuItems(allItems);
     }
     
@@ -77,6 +76,8 @@ const RestaurantPage: React.FC = () => {
             src={imageUrl}
             alt={restaurant.name}
             fill
+            sizes="100vw"
+            priority={true}
             className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
