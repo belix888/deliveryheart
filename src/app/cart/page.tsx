@@ -60,7 +60,6 @@ const CartPage: React.FC = () => {
 
     try {
       // Use user.id from AuthContext
-      const currentUserId = user.id;
       
       // Создаём адрес если его нет в сохранённых
       let addressId = null;
@@ -76,7 +75,7 @@ const CartPage: React.FC = () => {
         const { data: newAddr } = await supabase
           .from('addresses')
           .insert({
-            user_id: currentUserId,
+            user_id: user.id,
             address_text: address,
             apartment: apartment || undefined,
             comment: comment || undefined,
@@ -92,13 +91,12 @@ const CartPage: React.FC = () => {
 
       // Создаём заказ
       const orderData = {
-        user_id: currentUserId || 'guest',
+        user_id: user.id,
         restaurant_id: restaurant.id,
         delivery_address_id: addressId,
         total_amount: total,
         delivery_price: deliveryPrice,
         final_amount: total + deliveryPrice,
-        comment: comment || undefined,
       };
 
       console.log('Creating order with data:', orderData);
