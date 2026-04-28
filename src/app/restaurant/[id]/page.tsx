@@ -3,24 +3,64 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
-import { Star, Clock, MapPin, ArrowLeft } from "lucide-react";
+import { Star, Clock, MapPin, ArrowLeft, Package, Check, ChefHat, Truck, UserCheck, X } from "lucide-react";
 import Link from "next/link";
 import { fetchRestaurants, fetchRestaurantById, fetchRestaurantMenu, fetchCategories, fetchMenuItems, Restaurant, Category, MenuItem } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import { updateOrderStatus, getRestaurantOrders, checkRestaurantOrderAccess, RestaurantOrder } from "@/lib/api/orders";
 import DishCard from "@/components/DishCard";
 
 const RestaurantPage: React.FC = () => {
   const params = useParams();
   const restaurantId = params.id as string;
+  const { user } = useAuth();
   
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  
+  // Заказы и права доступа
+  const [orders, setOrders] = useState<RestaurantOrder[]>([]);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadRestaurantData();
   }, [restaurantId]);
+
+  // Загружаем заказы и проверяем права доступа при изменении user или restaurantId
+  useEffect(() => {
+    if (restaurantId && user?.id) {
+      checkAccessAndLoadOrders();
+    }
+  }, [restaurantId, user?.id]);
+
+  const checkAccessAndLoadOrders = async () => {
+    if (!user?.id || !restaurantId) return;
+    
+    setOrderLoading(true);
+    setError(null);
+    
+    try {
+      // Проверяем права доступа
+      const access = await checkRestaurantOrderAccess(user.id, restaurantId);
+      setHasAccess(access);
+      
+      if (access) {
+        // Загружаем заказы ресторана
+        const restaurantOrders = await getRestaurantOrders(restaurantId);
+        setOrders(restaurantOrders);
+      }
+    } catch (err) {
+      console.error("Ошибка проверки доступа:", err);
+      setError("Ошибка загрузки заказов");
+    } finally {
+      setOrderLoading(false);
+    }
+  };
 
   const loadRestaurantData = async () => {
     setLoading(true);
@@ -46,10 +86,124 @@ const RestaurantPage: React.FC = () => {
     setLoading(false);
   };
 
+  // Обновить статус заказа
+  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
+    if (!user?.id) return;
+    
+    setOrderLoading(true);
+    setError(null);
+    
+    try {
+      const success = await updateOrderStatus(orderId, newStatus, '', user.id);
+      
+      if (success) {
+        // Перезагружаем заказы
+        const restaurantOrders = await getRestaurantOrders(restaurantId);
+        setOrders(restaurantOrders);
+      } else {
+        setError("Не удалось обновить статус");
+      }
+    } catch (err) {
+      console.error("Ошибка обновления статуса:", err);
+      setError("Ошибка обновления статуса");
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
+  // Получить следующий статус
+  const getNextStatus = (currentStatus: string): string | null => {
+    const statusFlow: Record<string, string> = {
+      pending: 'confirmed',
+      confirmed: 'preparing',
+      preparing: 'ready',
+      ready: 'waiting_courier',
+      waiting_courier: 'in_delivery',
+    };
+    return statusFlow[currentStatus] || null;
+  };
+
+  // Получить название статуса на русском
+  const getStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      pending: 'Новый',
+      confirmed: 'Подтверждён',
+      preparing: 'Готовится',
+      ready: 'Готов',
+      waiting_courier: 'Ожидает курьера',
+      in_delivery: 'В доставке',
+      delivered: 'Доставлен',
+      cancelled: 'Отменён',
+    };
+    return labels[status] || status;
+  };
+
+  // Получить цвет статуса
+  const getStatusColor = (status: string): string => {
+    const colors: Record<string, string> = {
+      pending: 'bg-orange-100 text-orange-800 border-orange-200',
+      confirmed: 'bg-blue-100 text-blue-800 border-blue-200',
+      preparing: 'bg-purple-100 text-purple-800 border-purple-200',
+      ready: 'bg-green-100 text-green-800 border-green-200',
+      waiting_courier: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+      in_delivery: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      delivered: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      cancelled: 'bg-red-100 text-red-800 border-red-200',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  // Получить иконку статуса
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Package className="w-4 h-4" />;
+      case 'confirmed':
+        return <Check className="w-4 h-4" />;
+      case 'preparing':
+        return <ChefHat className="w-4 h-4" />;
+      case 'ready':
+        return <UserCheck className="w-4 h-4" />;
+      case 'waiting_courier':
+        return <Truck className="w-4 h-4" />;
+      case 'in_delivery':
+        return <Truck className="w-4 h-4" />;
+      case 'delivered':
+        return <Check className="w-4 h-4" />;
+      case 'cancelled':
+        return <X className="w-4 h-4" />;
+      default:
+        return <Package className="w-4 h-4" />;
+    }
+  };
+
+  // Формат даты
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Сообщение об ошибке
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-600 dark:text-red-400">
+          {error}
+        </div>
       </div>
     );
   }
@@ -170,6 +324,74 @@ const RestaurantPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Секция заказов для админа/владельца */}
+      {hasAccess && (
+        <div className="px-4 py-6 border-t border-[#F5F3F0] dark:border-[#3D3A36]">
+          <h2 className="text-lg font-display font-semibold mb-4">Заказы ресторана</h2>
+          
+          {orderLoading && orders.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="text-center py-8 bg-white dark:bg-[#2D2A26] rounded-xl border">
+              <p className="text-[#2D2A26]/60">Заказов пока нет</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {orders.map((order) => {
+                const nextStatus = getNextStatus(order.status);
+                return (
+                  <div
+                    key={order.id}
+                    className="bg-white dark:bg-[#2D2A26] rounded-xl border p-4"
+                  >
+                    {/* Заголовок заказа */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <div>
+                        <span className="font-semibold">Заказ #{order.order_number}</span>
+                        <span className="text-sm text-[#2D2A26]/60 ml-2">
+                          {formatDate(order.created_at)}
+                        </span>
+                      </div>
+                      <div className="font-semibold">
+                        {order.final_amount} ₽
+                      </div>
+                    </div>
+                    
+                    {/* Статус */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm border ${getStatusColor(order.status)}`}>
+                        {getStatusIcon(order.status)}
+                        {getStatusLabel(order.status)}
+                      </span>
+                    </div>
+                    
+                    {/* Клиент */}
+                    {order.users && (
+                      <div className="text-sm text-[#2D2A26]/70 dark:text-[#E8E6E3]/70 mb-3">
+                        Клиент: {order.users.full_name} {order.users.phone && `(${order.users.phone})`}
+                      </div>
+                    )}
+                    
+                    {/* Кнопка изменения статуса */}
+                    {nextStatus && (
+                      <button
+                        onClick={() => handleUpdateStatus(order.id, nextStatus)}
+                        disabled={orderLoading}
+                        className="w-full mt-2 px-4 py-2 bg-primary text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                      >
+                        {orderLoading ? 'Обновление...' : `Перевести в статус "${getStatusLabel(nextStatus)}"`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
