@@ -1,213 +1,368 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Search, Plus, Edit, Trash2, Shield, User, X, Check } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { 
+  Users, Search, Plus, X, Check, 
+  Store, Shield, Truck, User,
+  Loader2, AlertCircle, ChevronDown
+} from "lucide-react";
 
-interface UserRecord {
+interface UserRole {
   id: string;
-  email: string;
-  phone: string;
-  full_name: string;
-  role: string;
-  is_verified: boolean;
-  created_at: string;
+  name: string;
+  display_name: string;
+  restaurant_id: string | null;
+  restaurant_name: string | null;
+  is_active: boolean;
 }
 
-export default function UsersAdminPage() {
-  const [users, setUsers] = useState<UserRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
-  const [newRole, setNewRole] = useState("");
+interface UserData {
+  id: string;
+  email: string;
+  created_at: string;
+  roles: UserRole[];
+}
 
-  useEffect(() => {
-    loadUsers();
+interface Role {
+  id: string;
+  name: string;
+  display_name: string;
+}
+
+interface RestaurantData {
+  id: string;
+  name: string;
+}
+
+export default function UsersPage() {
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [restaurants, setRestaurants] = useState<RestaurantData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("");
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string>("");
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        // For demo, use mock data
+        setUsers([
+          {
+            id: "user-1",
+            email: "admin@example.com",
+            created_at: new Date().toISOString(),
+            roles: [{ id: "role-admin", name: "admin", display_name: "Администратор", restaurant_id: null, restaurant_name: null, is_active: true }],
+          },
+          {
+            id: "user-2",
+            email: "owner@restaurant.ru",
+            created_at: new Date().toISOString(),
+            roles: [{ id: "role-owner", name: "restaurant_owner", display_name: "Владелец ресторана", restaurant_id: "rest-1", restaurant_name: "Пельменная", is_active: true }],
+          },
+          {
+            id: "user-3",
+            email: "courier@delivery.ru",
+            created_at: new Date().toISOString(),
+            roles: [{ id: "role-courier", name: "courier", display_name: "Курьер", restaurant_id: null, restaurant_name: null, is_active: true }],
+          },
+        ]);
+        setRoles([
+          { id: "role-admin", name: "admin", display_name: "Администратор" },
+          { id: "role-owner", name: "restaurant_owner", display_name: "Владелец ресторана" },
+          { id: "role-manager", name: "restaurant_admin", display_name: "Админ ресторана" },
+          { id: "role-courier", name: "courier", display_name: "Курьер" },
+          { id: "role-client", name: "client", display_name: "Клиент" },
+        ]);
+        setRestaurants([
+          { id: "rest-1", name: "Пельменная" },
+          { id: "rest-2", name: "Burger King" },
+          { id: "rest-3", name: "KFC" },
+        ]);
+        return;
+      }
+
+      // Real API call
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'x-user-id': session.user.id,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Ошибка загрузки');
+      }
+
+      const data = await response.json();
+      setUsers(data.users || []);
+      setRoles(data.roles || []);
+      setRestaurants(data.restaurants || []);
+    } catch (err: any) {
+      console.error('[Users] Error:', err);
+      setError(err.message || 'Ошибка загрузки данных');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const loadUsers = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (data) setUsers(data);
-    setLoading(false);
-  };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const updateRole = async (userId: string, role: string) => {
-    await supabase
-      .from("users")
-      .update({ role })
-      .eq("id", userId);
-    loadUsers();
-    setEditingUser(null);
-  };
+  const handleAssignRole = async () => {
+    if (!selectedUser || !selectedRole) return;
 
-  const deleteUser = async (userId: string) => {
-    if (confirm("Удалить этого пользователя?")) {
-      await supabase.from("users").delete().eq("id", userId);
-      loadUsers();
+    try {
+      setIsAssigning(true);
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': session?.user?.id || '',
+        },
+        body: JSON.stringify({
+          target_user_id: selectedUser.id,
+          role_name: selectedRole,
+          restaurant_id: selectedRestaurant || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Ошибка');
+      }
+
+      setShowAddModal(false);
+      setSelectedUser(null);
+      setSelectedRole("");
+      setSelectedRestaurant("");
+      fetchData();
+    } catch (err: any) {
+      console.error('[Assign] Error:', err);
+      setError(err.message || 'Ошибка назначения роли');
+    } finally {
+      setIsAssigning(false);
     }
   };
 
-  const filteredUsers = users.filter(
-    (u) =>
-      !searchQuery ||
-      u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.phone?.includes(searchQuery)
+  const handleRemoveRole = async (userRoleId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(`/api/admin/users?user_role_id=${userRoleId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': session?.user?.id || '',
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Ошибка');
+      }
+
+      fetchData();
+    } catch (err: any) {
+      console.error('[Remove] Error:', err);
+      setError(err.message || 'Ошибка удаления роли');
+    }
+  };
+
+  const getRoleIcon = (roleName: string) => {
+    switch (roleName) {
+      case 'admin':
+        return <Shield className="w-4 h-4" />;
+      case 'restaurant_owner':
+      case 'restaurant_admin':
+        return <Store className="w-4 h-4" />;
+      case 'courier':
+        return <Truck className="w-4 h-4" />;
+      default:
+        return <User className="w-4 h-4" />;
+    }
+  };
+
+  const filteredUsers = users.filter(user =>
+    user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-display font-bold">Пользователи</h1>
-        <p className="text-[#2D2A26]/60">{users.length} пользователей</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Пользователи</h1>
+          <p className="text-neutral-400">Управление пользователями и ролями</p>
+        </div>
       </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#2D2A26]/40" />
+      {/* Error */}
+      {error && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500" />
+          <p className="text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
         <input
           type="text"
+          placeholder="Поиск по email..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Поиск по имени, email или телефону"
-          className="w-full pl-12 pr-4 py-3 rounded-xl bg-[#F5F3F0] dark:bg-[#2D2A26] outline-none"
+          className="w-full pl-12 pr-4 py-3 rounded-xl bg-[#1A1918] border border-[#2D2A26] text-white placeholder-neutral-500 focus:outline-none focus:border-primary"
         />
       </div>
 
+      {/* Users List */}
       <div className="space-y-4">
         {filteredUsers.map((user) => (
           <div
             key={user.id}
-            className="bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-2xl p-4"
+            className="p-4 rounded-xl bg-[#1A1918] border border-[#2D2A26]"
           >
-            <div className="flex justify-between items-start">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                  <User className="w-6 h-6 text-primary" />
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="font-medium text-white">{user.email}</p>
+                <p className="text-sm text-neutral-500">
+                  Создан: {new Date(user.created_at).toLocaleDateString('ru-RU')}
+                </p>
+                
+                {/* Roles */}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {user.roles.filter(r => r.is_active).map((role) => (
+                    <div
+                      key={role.id}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#2D2A26] text-sm"
+                    >
+                      {getRoleIcon(role.name)}
+                      <span className="text-white">{role.display_name}</span>
+                      {role.restaurant_name && (
+                        <span className="text-neutral-400">• {role.restaurant_name}</span>
+                      )}
+                      <button
+                        onClick={() => handleRemoveRole(role.id)}
+                        className="ml-1 text-neutral-500 hover:text-red-400"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <button
+                    onClick={() => {
+                      setSelectedUser(user);
+                      setShowAddModal(true);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-sm hover:bg-primary/30"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Добавить роль
+                  </button>
                 </div>
-                <div>
-                  <p className="font-semibold">{user.full_name || "Без имени"}</p>
-                  <p className="text-sm text-[#2D2A26]/60">
-                    {user.email || user.phone || "Нет контактов"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    user.role === "admin"
-                      ? "bg-red-100 text-red-700"
-                      : user.role === "moderator"
-                      ? "bg-purple-100 text-purple-700"
-                      : "bg-green-100 text-green-700"
-                  }`}
-                >
-                  {user.role === "admin"
-                    ? "Админ"
-                    : user.role === "moderator"
-                    ? "Модератор"
-                    : "Пользователь"}
-                </span>
-                {user.is_verified && (
-                  <Check className="w-4 h-4 text-green-500" />
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center mt-3 pt-3 border-t border-[#2D2A26]/10">
-              <span className="text-sm text-[#2D2A26]/60">
-                Регистрация: {formatDate(user.created_at)}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setEditingUser(user);
-                    setNewRole(user.role);
-                  }}
-                  className="p-2 text-[#2D2A26]/60 hover:text-[#2D2A26]"
-                >
-                  <Shield className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => deleteUser(user.id)}
-                  className="p-2 text-red-400 hover:text-red-600"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {filteredUsers.length === 0 && (
-        <div className="text-center py-12 text-[#2D2A26]/60">
-          Пользователи не найдены
-        </div>
-      )}
-
-      {/* Modal для изменения роли */}
-      {editingUser && (
+      {/* Add Role Modal */}
+      {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-[#2D2A26] rounded-2xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold mb-4">Изменить роль</h2>
-            <p className="text-[#2D2A26]/60 mb-4">
-              Пользователь: {editingUser.full_name}
+          <div className="w-full max-w-md p-6 rounded-2xl bg-[#1A1918] border border-[#2D2A26]">
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Назначить роль
+            </h2>
+            
+            <p className="text-neutral-400 mb-4">
+              {selectedUser?.email}
             </p>
 
-            <div className="space-y-2 mb-6">
-              {[
-                { value: "user", label: "Пользователь" },
-                { value: "moderator", label: "Модератор" },
-                { value: "admin", label: "Админ" },
-              ].map((role) => (
-                <button
-                  key={role.value}
-                  onClick={() => setNewRole(role.value)}
-                  className={`w-full p-3 rounded-xl text-left flex items-center justify-between ${
-                    newRole === role.value
-                      ? "bg-primary/10 border-2 border-primary"
-                      : "bg-[#F5F3F0] dark:bg-[#3D3A36]"
-                  }`}
-                >
-                  <span>{role.label}</span>
-                  {newRole === role.value && (
-                    <Check className="w-5 h-5 text-primary" />
-                  )}
-                </button>
-              ))}
+            {/* Role Select */}
+            <div className="mb-4">
+              <label className="block text-sm text-neutral-400 mb-2">Роль</label>
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-[#2D2A26] border border-[#3D3A36] text-white focus:outline-none focus:border-primary"
+              >
+                <option value="">Выберите роль</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.name}>
+                    {role.display_name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex gap-3">
+            {/* Restaurant Select (for restaurant roles) */}
+            {['restaurant_owner', 'restaurant_admin'].includes(selectedRole) && (
+              <div className="mb-4">
+                <label className="block text-sm text-neutral-400 mb-2">Ресторан</label>
+                <select
+                  value={selectedRestaurant}
+                  onChange={(e) => setSelectedRestaurant(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-[#2D2A26] border border-[#3D3A36] text-white focus:outline-none focus:border-primary"
+                >
+                  <option value="">Выберите ресторан</option>
+                  {restaurants.map((rest) => (
+                    <option key={rest.id} value={rest.id}>
+                      {rest.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setEditingUser(null)}
-                className="flex-1 py-3 bg-[#F5F3F0] dark:bg-[#3D3A36] rounded-xl"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setSelectedUser(null);
+                  setSelectedRole("");
+                  setSelectedRestaurant("");
+                }}
+                className="flex-1 py-3 rounded-xl bg-[#2D2A26] text-white hover:bg-[#3D3A36]"
               >
                 Отмена
               </button>
               <button
-                onClick={() => updateRole(editingUser.id, newRole)}
-                className="flex-1 py-3 bg-primary dark:bg-primary-dark text-white rounded-xl"
+                onClick={handleAssignRole}
+                disabled={!selectedRole || isAssigning}
+                className="flex-1 py-3 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Сохранить
+                {isAssigning ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Назначить
+                  </>
+                )}
               </button>
             </div>
           </div>
