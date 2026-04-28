@@ -182,7 +182,7 @@ const OrdersPage: React.FC = () => {
   }, {} as Record<string, number>);
 
   // Get unique restaurants
-  const restaurants = [...new Set(orders.map((o) => o.restaurants?.name).filter(Boolean))];
+  const restaurants = Array.from(new Set(orders.map((o) => o.restaurants?.name).filter(Boolean)));
 
   if (loading) {
     return (

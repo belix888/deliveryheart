@@ -448,8 +448,8 @@ export async function getCourierStats(courierId: string): Promise<CourierStatsSu
       total_earnings: parseFloat(todayStats.total_earnings || '0'),
       total_distance_km: parseFloat(todayStats.total_distance_km || '0'),
     } : { orders_completed: 0, total_earnings: 0, total_distance_km: 0 },
-    week: aggregateStats(weekStats),
-    month: aggregateStats(monthStats),
+    week: aggregateStats(weekStats || []),
+    month: aggregateStats(monthStats || []),
   };
 }
 
@@ -482,7 +482,7 @@ export async function getAllCouriers(filters?: {
     query = query.eq('is_active', filters.isActive);
   }
   
-  const { data, error } = query;
+  const { data, error } = await query;
   
   if (error) {
     console.error('[couriers.api] getAllCouriers error:', error);

@@ -20,8 +20,6 @@ import {
   Loader2,
   Bike,
   Car,
-  Foot,
-  Scooter,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Courier } from "@/lib/types/courier";
@@ -124,8 +122,8 @@ function CourierDetailPage({ params }: { params: Promise<{ id: string }> }) {
           total_earnings: parseFloat(todayStats.total_earnings || "0"),
           total_distance_km: parseFloat(todayStats.total_distance_km || "0"),
         } : { orders_completed: 0, total_earnings: 0, total_distance_km: 0 },
-        week: aggregateStats(weekStats),
-        month: aggregateStats(monthStats),
+        week: aggregateStats(weekStats || []),
+        month: aggregateStats(monthStats || []),
       });
       
       // Load order history
@@ -208,8 +206,8 @@ function CourierDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const icons: Record<string, any> = {
       bike: Bike,
       car: Car,
-      scooter: Scooter,
-      walk: Foot,
+      scooter: Package,
+      walk: MapPin,
     };
     return icons[type] || Bike;
   };

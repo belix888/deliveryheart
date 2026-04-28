@@ -215,7 +215,7 @@ export default function EarningsPage() {
             ))}
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Bottom Navigation */}
       <BottomNav />
