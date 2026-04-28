@@ -16,27 +16,25 @@ const CartPage: React.FC = () => {
   const [comment, setComment] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAddresses();
-  }, []);
+    if (user) {
+      loadAddresses();
+    }
+  }, [user]);
 
   const loadAddresses = async () => {
-    const { data: users } = await supabase.from('users').select('id').limit(1);
-    if (users && users.length > 0) {
-      const uid = users[0].id;
-      setUserId(uid);
-      const addrs = await fetchAddresses(uid);
-      setSavedAddresses(addrs);
-      
-      // Автозаполнение дефолтного адреса
-      const defaultAddr = addrs.find(a => a.is_default);
-      if (defaultAddr) {
-        setAddress(defaultAddr.address_text);
-      }
+    if (!user) return;
+    
+    const addrs = await fetchAddresses(user.id);
+    setSavedAddresses(addrs);
+    
+    // Автозаполнение дефолтного адреса
+    const defaultAddr = addrs.find(a => a.is_default);
+    if (defaultAddr) {
+      setAddress(defaultAddr.address_text);
     }
   };
 
@@ -61,11 +59,8 @@ const CartPage: React.FC = () => {
     setIsOrdering(true);
 
     try {
-      // Получаем userId если есть из AuthContext
-      let currentUserId = userId;
-      if (!currentUserId) {
-        currentUserId = 'guest';
-      }
+      // Use user.id from AuthContext
+      const currentUserId = user.id;
       
       // Создаём адрес если его нет в сохранённых
       let addressId = null;
@@ -76,7 +71,7 @@ const CartPage: React.FC = () => {
       );
       if (existingAddr) {
         addressId = existingAddr.id;
-      } else if (currentUserId) {
+      } else {
         // Создаём новый адрес
         const { data: newAddr } = await supabase
           .from('addresses')
