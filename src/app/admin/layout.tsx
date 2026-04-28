@@ -24,12 +24,14 @@ import {
   Sun,
   ChevronRight,
   Package,
+  Bike,
 } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Дашборд", href: "/admin" },
   { icon: ShoppingCart, label: "Заказы", href: "/admin/orders" },
+  { icon: Bike, label: "Курьеры", href: "/admin/couriers" },
   { icon: Store, label: "Рестораны", href: "/admin/restaurants" },
   { icon: Users, label: "Пользователи", href: "/admin/users" },
   { icon: UserCog, label: "Админы ресторанов", href: "/admin/restaurant-admins" },

@@ -1,0 +1,493 @@
+import { supabase } from '@/lib/supabase';
+import type { Courier, CourierOrder, CourierEarnings, CourierStatsSummary } from '@/lib/types/courier';
+
+// =====================================================
+// COURIER PROFILE OPERATIONS
+// =====================================================
+
+/**
+ * Получить профиль текущего курьера по user_id
+ */
+export async function getCourierProfile(userId: string): Promise<Courier | null> {
+  console.log('[couriers.api] getCourierProfile called with userId:', userId);
+  
+  const { data, error } = await supabase
+    .from('couriers')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+  
+  if (error) {
+    console.error('[couriers.api] getCourierProfile error:', error);
+    return null;
+  }
+  
+  return data;
+}
+
+/**
+ * Получить профиль курьера по courier_id
+ */
+export async function getCourierProfileById(courierId: string): Promise<Courier | null> {
+  console.log('[couriers.api] getCourierProfileById called with courierId:', courierId);
+  
+  const { data, error } = await supabase
+    .from('couriers')
+    .select('*')
+    .eq('id', courierId)
+    .single();
+  
+  if (error) {
+    console.error('[couriers.api] getCourierProfileById error:', error);
+    return null;
+  }
+  
+  return data;
+}
+
+/**
+ * Создать/обновить профиль курьера
+ */
+export async function upsertCourierProfile(
+  userId: string,
+  data: Partial<Courier>
+): Promise<Courier | null> {
+  console.log('[couriers.api] upsertCourierProfile called with userId:', userId, 'data:', data);
+  
+  // Check if profile exists
+  const { data: existing } = await supabase
+    .from('couriers')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+  
+  const profileData = {
+    user_id: userId,
+    ...data,
+    updated_at: new Date().toISOString(),
+  };
+  
+  let result;
+  if (existing) {
+    // Update existing
+    result = await supabase
+      .from('couriers')
+      .update(profileData)
+      .eq('user_id', userId)
+      .select()
+      .single();
+  } else {
+    // Insert new
+    result = await supabase
+      .from('couriers')
+      .insert({
+        ...profileData,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+  }
+  
+  if (result.error) {
+    console.error('[couriers.api] upsertCourierProfile error:', result.error);
+    return null;
+  }
+  
+  return result.data;
+}
+
+/**
+ * Изменить статус курьера (online/offline/busy)
+ */
+export async function setCourierStatus(
+  courierId: string,
+  status: 'online' | 'offline' | 'busy'
+): Promise<boolean> {
+  console.log('[couriers.api] setCourierStatus called with courierId:', courierId, 'status:', status);
+  
+  const { error } = await supabase
+    .from('couriers')
+    .update({ 
+      status, 
+      updated_at: new Date().toISOString() 
+    })
+    .eq('id', courierId);
+  
+  if (error) {
+    console.error('[couriers.api] setCourierStatus error:', error);
+    return false;
+  }
+  
+  return true;
+}
+
+// =====================================================
+// ORDER OPERATIONS
+// =====================================================
+
+/**
+ * Получить доступные заказы для курьера в городе
+ */
+export async function getAvailableOrders(city: string): Promise<any[]> {
+  console.log('[couriers.api] getAvailableOrders called with city:', city);
+  
+  // Get orders without courier assignment that are ready for delivery
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      restaurants (name, address, phone)
+    `)
+    .eq('status', 'ready') // Заказ готов к доставке
+    .is('courier_id', null)
+    .eq('delivery_city', city)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  
+  if (error) {
+    console.error('[couriers.api] getAvailableOrders error:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+/**
+ * Получить все заказы (независимо от статуса) для курьера
+ */
+export async function getOrdersForCourier(courierId: string): Promise<any[]> {
+  console.log('[couriers.api] getOrdersForCourier called with courierId:', courierId);
+  
+  // Get order_ids assigned to this courier
+  const { data: courierOrders } = await supabase
+    .from('courier_orders')
+    .select('order_id')
+    .eq('courier_id', courierId);
+  
+  if (!courierOrders || courierOrders.length === 0) {
+    return [];
+  }
+  
+  const orderIds = courierOrders.map(co => co.order_id);
+  
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      restaurants (name, address, phone)
+    `)
+    .in('id', orderIds)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('[couriers.api] getOrdersForCourier error:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+/**
+ * Принять заказ
+ */
+export async function acceptOrder(orderId: string, courierId: string): Promise<boolean> {
+  console.log('[couriers.api] acceptOrder called with orderId:', orderId, 'courierId:', courierId);
+  
+  // Check if order is available
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id, status, courier_id')
+    .eq('id', orderId)
+    .single();
+  
+  if (!order) {
+    console.error('[couriers.api] acceptOrder: order not found');
+    return false;
+  }
+  
+  if (order.status !== 'ready' && order.status !== 'confirmed') {
+    console.error('[couriers.api] acceptOrder: order not ready for delivery, status:', order.status);
+    return false;
+  }
+  
+  if (order.courier_id) {
+    console.error('[couriers.api] acceptOrder: order already has courier');
+    return false;
+  }
+  
+  // Create courier_order record
+  const { error: insertError } = await supabase
+    .from('courier_orders')
+    .insert({
+      courier_id: courierId,
+      order_id: orderId,
+      status: 'assigned',
+    });
+  
+  if (insertError) {
+    console.error('[couriers.api] acceptOrder insert error:', insertError);
+    return false;
+  }
+  
+  // Update order with courier
+  const { error: updateError } = await supabase
+    .from('orders')
+    .update({ 
+      courier_id: courierId,
+      status: 'in_delivery',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', orderId);
+  
+  if (updateError) {
+    console.error('[couriers.api] acceptOrder update error:', updateError);
+    return false;
+  }
+  
+  // Update courier status to busy
+  await setCourierStatus(courierId, 'busy');
+  
+  return true;
+}
+
+/**
+ * Обновить статус заказа
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  courierId: string,
+  status: 'accepted' | 'picked_up' | 'in_delivery' | 'delivered' | 'cancelled' | 'failed'
+): Promise<boolean> {
+  console.log('[couriers.api] updateOrderStatus called with orderId:', orderId, 'status:', status);
+  
+  // Find courier_order
+  const { data: courierOrder } = await supabase
+    .from('courier_orders')
+    .select('*')
+    .eq('order_id', orderId)
+    .eq('courier_id', courierId)
+    .single();
+  
+  if (!courierOrder) {
+    console.error('[couriers.api] updateOrderStatus: courier_order not found');
+    return false;
+  }
+  
+  const updateData: any = {
+    status,
+    updated_at: new Date().toISOString(),
+  };
+  
+  if (status === 'picked_up') {
+    updateData.pickup_time = new Date().toISOString();
+  } else if (status === 'delivered') {
+    updateData.delivery_time = new Date().toISOString();
+  }
+  
+  // Update courier_order
+  const { error } = await supabase
+    .from('courier_orders')
+    .update(updateData)
+    .eq('id', courierOrder.id);
+  
+  if (error) {
+    console.error('[couriers.api] updateOrderStatus error:', error);
+    return false;
+  }
+  
+  // Update main order status
+  let orderStatus = status;
+  if (status === 'delivered') {
+    orderStatus = 'delivered';
+  } else if (status === 'cancelled' || status === 'failed') {
+    orderStatus = 'cancelled';
+  }
+  
+  await supabase
+    .from('orders')
+    .update({ 
+      status: orderStatus,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', orderId);
+  
+  // If delivered, set courier back to online
+  if (status === 'delivered') {
+    await setCourierStatus(courierId, 'online');
+  }
+  
+  return true;
+}
+
+// =====================================================
+// COURIER ORDERS
+// =====================================================
+
+/**
+ * Получить заказы курьера
+ */
+export async function getCourierOrders(
+  courierId: string,
+  status?: string
+): Promise<CourierOrder[]> {
+  console.log('[couriers.api] getCourierOrders called with courierId:', courierId, 'status:', status);
+  
+  let query = supabase
+    .from('courier_orders')
+    .select(`
+      *,
+      orders (*, restaurants (name))
+    `)
+    .eq('courier_id', courierId);
+  
+  if (status) {
+    query = query.eq('status', status);
+  }
+  
+  const { data, error } = await query.order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('[couriers.api] getCourierOrders error:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+// =====================================================
+// EARNINGS OPERATIONS
+// =====================================================
+
+/**
+ * Получить заработок курьера
+ */
+export async function getCourierEarnings(
+  courierId: string,
+  period: 'daily' | 'weekly' | 'monthly' = 'daily'
+): Promise<CourierEarnings[]> {
+  console.log('[couriers.api] getCourierEarnings called with courierId:', courierId, 'period:', period);
+  
+  let startDate: string;
+  const now = new Date();
+  
+  if (period === 'daily') {
+    startDate = now.toISOString().split('T')[0];
+  } else if (period === 'weekly') {
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    startDate = weekAgo.toISOString().split('T')[0];
+  } else {
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    startDate = monthAgo.toISOString().split('T')[0];
+  }
+  
+  const { data, error } = await supabase
+    .from('courier_earnings')
+    .select('*')
+    .eq('courier_id', courierId)
+    .gte('period_date', startDate)
+    .order('period_date', { ascending: false });
+  
+  if (error) {
+    console.error('[couriers.api] getCourierEarnings error:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+// =====================================================
+// STATS OPERATIONS
+// =====================================================
+
+/**
+ * Получить статистику курьера
+ */
+export async function getCourierStats(courierId: string): Promise<CourierStatsSummary> {
+  console.log('[couriers.api] getCourierStats called with courierId:', courierId);
+  
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  
+  // Today stats
+  const { data: todayStats } = await supabase
+    .from('courier_stats')
+    .select('orders_completed, total_earnings, total_distance_km')
+    .eq('courier_id', courierId)
+    .eq('stat_date', todayStr)
+    .single();
+  
+  // Week stats
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const weekAgoStr = weekAgo.toISOString().split('T')[0];
+  
+  const { data: weekStats } = await supabase
+    .from('courier_stats')
+    .select('orders_completed, total_earnings, total_distance_km')
+    .eq('courier_id', courierId)
+    .gte('stat_date', weekAgoStr);
+  
+  // Month stats
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const monthAgoStr = monthAgo.toISOString().split('T')[0];
+  
+  const { data: monthStats } = await supabase
+    .from('courier_stats')
+    .select('orders_completed, total_earnings, total_distance_km')
+    .eq('courier_id', courierId)
+    .gte('stat_date', monthAgoStr);
+  
+  const aggregateStats = (stats: any[]) => ({
+    orders_completed: stats?.reduce((sum, s) => sum + (s.orders_completed || 0), 0) || 0,
+    total_earnings: stats?.reduce((sum, s) => sum + parseFloat(s.total_earnings || '0'), 0) || 0,
+    total_distance_km: stats?.reduce((sum, s) => sum + parseFloat(s.total_distance_km || '0'), 0) || 0,
+  });
+  
+  return {
+    today: todayStats ? {
+      orders_completed: todayStats.orders_completed || 0,
+      total_earnings: parseFloat(todayStats.total_earnings || '0'),
+      total_distance_km: parseFloat(todayStats.total_distance_km || '0'),
+    } : { orders_completed: 0, total_earnings: 0, total_distance_km: 0 },
+    week: aggregateStats(weekStats),
+    month: aggregateStats(monthStats),
+  };
+}
+
+// =====================================================
+// ADMIN OPERATIONS
+// =====================================================
+
+/**
+ * Получить всех курьеров (admin)
+ */
+export async function getAllCouriers(filters?: {
+  status?: string;
+  city?: string;
+  isActive?: boolean;
+}): Promise<Courier[]> {
+  console.log('[couriers.api] getAllCouriers called with filters:', filters);
+  
+  let query = supabase
+    .from('couriers')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+  if (filters?.city) {
+    query = query.eq('current_city', filters.city);
+  }
+  if (filters?.isActive !== undefined) {
+    query = query.eq('is_active', filters.isActive);
+  }
+  
+  const { data, error } = query;
+  
+  if (error) {
+    console.error('[couriers.api] getAllCouriers error:', error);
+    return [];
+  }
+  
+  return data || [];
+}
