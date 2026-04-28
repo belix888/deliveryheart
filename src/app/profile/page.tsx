@@ -14,10 +14,13 @@ import {
   Plus,
   Edit,
   Trash2,
+  ChevronRight,
+  Package,
 } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { supabase, fetchUserOrders, fetchAddresses, Order, Address } from "@/lib/supabase";
+import OrderTracker from "@/components/OrderTracker";
 
 const ProfilePage: React.FC = () => {
   const router = useRouter();
@@ -30,6 +33,8 @@ const ProfilePage: React.FC = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("Гость");
   const [userPhone, setUserPhone] = useState<string>("");
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [showTracker, setShowTracker] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -158,7 +163,56 @@ const ProfilePage: React.FC = () => {
       {/* Tab Content */}
       {activeTab === "orders" && (
         <div>
-          <h2 className="text-lg font-semibold mb-4">История заказов</h2>
+          <h2 className="text-lg font-semibold mb-4">Мои заказы</h2>
+          
+          {/* Active Order Tracker */}
+          {orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length > 0 && !showTracker && (
+            <div className="mb-4 p-4 rounded-2xl bg-primary/10 border border-primary/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Package className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Активный заказ</p>
+                    <p className="text-sm text-neutral-400">
+                      {orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length} заказ(ов) в процессе
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const activeOrder = orders.find(o => !['delivered', 'cancelled'].includes(o.status));
+                    if (activeOrder) {
+                      setActiveOrderId(activeOrder.id);
+                      setShowTracker(true);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium"
+                >
+                  Отследить
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Order Tracker Modal */}
+          {showTracker && activeOrderId && (
+            <div className="mb-4 p-4 rounded-2xl bg-[#1A1918] border border-[#2D2A26]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-white">Отслеживание заказа</h3>
+                <button
+                  onClick={() => setShowTracker(false)}
+                  className="text-neutral-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <OrderTracker orderId={activeOrderId} />
+            </div>
+          )}
+
           {orders.length === 0 ? (
             <div className="text-center py-12 bg-[#F5F3F0] dark:bg-[#2D2A26] rounded-2xl">
               <Clock className="w-12 h-12 mx-auto mb-4 text-[#2D2A26]/30 dark:text-[#E8E6E3]/30" />
