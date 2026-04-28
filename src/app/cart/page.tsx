@@ -5,10 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Minus, Plus, MapPin, ArrowLeft, CreditCard, Printer } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { supabase, createOrder, Address, fetchAddresses } from "@/lib/supabase";
 
 const CartPage: React.FC = () => {
   const { items, updateQuantity, removeFromCart, total, deliveryPrice, clearCart, restaurant } = useCart();
+  const { user } = useAuth();
   const [address, setAddress] = useState("");
   const [apartment, setApartment] = useState("");
   const [comment, setComment] = useState("");
@@ -39,6 +41,12 @@ const CartPage: React.FC = () => {
   };
 
   const handleOrder = async () => {
+    // Require authentication before ordering
+    if (!user) {
+      window.location.href = '/auth';
+      return;
+    }
+    
     if (!address) {
       setError("Пожалуйста, укажите адрес доставки");
       return;

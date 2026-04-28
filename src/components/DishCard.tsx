@@ -2,9 +2,11 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Plus, Check } from "lucide-react";
 import { MenuItem } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { getDishEmoji, getDishPlaceholderStyle } from "@/lib/images";
 
 interface DishCardProps {
@@ -18,11 +20,18 @@ interface DishCardProps {
 
 const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
   const { addToCart } = useCart();
+  const { user } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
 
   const hasImage = dish.image_url && dish.image_url.startsWith('http');
 
   const handleAddToCart = () => {
+    // Require authentication before adding to cart
+    if (!user) {
+      // Could show a toast or redirect to auth
+      window.location.href = '/auth';
+      return;
+    }
     setIsAdding(true);
     addToCart({
       id: dish.id,
