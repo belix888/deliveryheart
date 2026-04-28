@@ -3,191 +3,130 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getCourierOrders, updateOrderStatus, acceptOrder } from "@/lib/api/couriers";
+import { getCourierOrders, updateOrderStatus, getCourierProfileById } from "@/lib/api/couriers";
+import { useAuth } from "@/context/AuthContext";
 import OrderCard from "@/components/courier/OrderCard";
 import StatusBadge from "@/components/courier/StatusBadge";
 import BottomNav from "@/components/courier/BottomNav";
 import { ArrowLeft, Package, CheckCircle2, Clock, Truck } from "lucide-react";
+import type { CourierOrder } from "@/lib/types/courier";
 
-interface MyOrder {
-  id: string;
-  order_id: string;
-  status: "assigned" | "accepted" | "picked_up" | "in_delivery" | "delivered";
-  earnings: number;
-  distance_km?: number;
-  pickup_time?: string;
-  delivery_time?: string;
-  created_at: string;
-  updated_at: string;
-  order?: {
-    id: string;
-    order_number?: string;
-    address: string;
-    total_amount: number;
-    delivery_distance?: number;
-    created_at: string;
-    restaurants?: {
-    name: string;
-    address: string;
-    };
-    customer_name?: string;
-    customer_phone?: string;
-  };
-}
-
-const mockActiveOrders: MyOrder[] = [
-  {
-    id: "co-1",
-    order_id: "order-1",
-    status: "accepted",
-    earnings: 150,
-    distance_km: 1.2,
-    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-    order: {
-      id: "order-1",
-      order_number: " №1247",
-      address: "ул. Ленина, 25, кв. 14",
-      total_amount: 2450,
-      delivery_distance: 1.2,
-      created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-      restaurants: { name: "Суши Wok", address: "ул. Пушкина, 10" },
-      customer_name: "Иван",
-      customer_phone: "+7 999 123-45-67",
-    },
-  },
-  {
-    id: "co-2",
-    order_id: "order-2",
-    status: "picked_up",
-    earnings: 200,
-    distance_km: 2.5,
-    pickup_time: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-    order: {
-      id: "order-2",
-      order_number: " №1248",
-      address: "пр. Мира, 42, офис 305",
-      total_amount: 1890,
-      delivery_distance: 2.5,
-      created_at: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-      restaurants: { name: "Pizza Hut", address: "ТЦ Европа" },
-      customer_name: "Мария",
-      customer_phone: "+7 999 987-65-43",
-    },
-  },
-];
-
-const mockCompletedOrders: MyOrder[] = [
-  {
-    id: "co-3",
-    order_id: "order-3",
-    status: "delivered",
-    earnings: 180,
-    distance_km: 0.8,
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 1.5 * 60 * 60 * 1000).toISOString(),
-    order: {
-      id: "order-3",
-      order_number: " №1245",
-      address: "ул. Дворцовая, 8",
-      total_amount: 3200,
-      delivery_distance: 0.8,
-      created_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
-      restaurants: { name: "Burger King", address: "ул. Садовая, 3" },
-      customer_name: "Алексей",
-      customer_phone: "+7 999 111-22-33",
-    },
-  },
-  {
-    id: "co-4",
-    order_id: "order-4",
-    status: "delivered",
-    earnings: 220,
-    distance_km: 3.1,
-    created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    order: {
-      id: "order-4",
-      order_number: " №1242",
-      address: "ул. Новая, 15, подъезд 2",
-      total_amount: 1650,
-      delivery_distance: 3.1,
-      created_at: new Date(Date.now() - 5.5 * 60 * 60 * 1000).toISOString(),
-      restaurants: { name: "KFC", address: "ТЦ Грин" },
-      customer_name: "Елена",
-      customer_phone: "+7 999 444-55-66",
-    },
-  },
-  {
-    id: "co-5",
-    order_id: "order-5",
-    status: "delivered",
-    earnings: 250,
-    distance_km: 1.8,
-    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
-    order: {
-      id: "order-5",
-      order_number: " №1239",
-      address: "пр. Победы, 78, кв. 45",
-      total_amount: 4100,
-      delivery_distance: 1.8,
-      created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
-      restaurants: { name: "Якитория", address: "ул. Центральная, 12" },
-      customer_name: "Сергей",
-      customer_phone: "+7 999 777-88-99",
-    },
-  },
-];
+type OrderStatus = "assigned" | "accepted" | "picked_up" | "in_delivery" | "delivered" | "cancelled" | "failed" | "pending";
 
 type TabType = "active" | "completed";
 
 export default function MyOrdersPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("active");
-  const [activeOrders, setActiveOrders] = useState<MyOrder[]>(mockActiveOrders);
-  const [completedOrders, setCompletedOrders] = useState<MyOrder[]>(mockCompletedOrders);
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeOrders, setActiveOrders] = useState<CourierOrder[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<CourierOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  const [courierId, setCourierId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Handle order actions
-  const handleAction = async (order: MyOrder) => {
-    if (!order.order) return;
+  // Получение ID курьера
+  useEffect(() => {
+    const initCourier = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const profile = await getCourierProfileById(user.id);
+        if (profile) {
+          setCourierId(profile.id);
+        }
+      } catch (err) {
+        console.error("Ошибка получения профиля курьера:", err);
+        setError("Не удалось получить данные курьера");
+        setIsLoading(false);
+      }
+    };
+    
+    initCourier();
+  }, [user?.id]);
+
+  // Загрузка заказов
+  const fetchOrders = useCallback(async () => {
+    if (!courierId) return;
+    
+    try {
+      setError(null);
+      const data = await getCourierOrders(courierId);
+      
+      // Разделяем на активные и завершённые
+      const active = data.filter((o) => 
+        ["assigned", "accepted", "picked_up", "in_delivery"].includes(o.status)
+      );
+      const completed = data.filter((o) => 
+        ["delivered", "cancelled", "failed"].includes(o.status)
+      );
+      
+      setActiveOrders(active);
+      setCompletedOrders(completed);
+    } catch (err) {
+      console.error("Ошибка загрузки заказов:", err);
+      setError("Не удалось загрузить заказы");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [courierId]);
+
+  useEffect(() => {
+    if (courierId) {
+      fetchOrders();
+    }
+  }, [courierId, fetchOrders]);
+
+  // Обработка действий с заказом
+  const handleAction = async (order: CourierOrder) => {
+    if (!order.order || !courierId) return;
     
     setProcessingOrderId(order.id);
     try {
-      const newStatus = 
-        order.status === "assigned" ? "accepted" :
-        order.status === "accepted" ? "picked_up" :
-        "in_delivery";
+      let newStatus: "accepted" | "picked_up" | "delivered" | null = null;
       
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
-      // Update local state
-      if (newStatus === "accepted" || newStatus === "picked_up") {
-        setActiveOrders((prev) =>
-          prev.map((o) =>
-            o.id === order.id ? { ...o, status: newStatus } : o
-          )
-        );
-      } else if (newStatus === "in_delivery") {
-        // Move to completed
-        setActiveOrders((prev) => prev.filter((o) => o.id !== order.id));
-        setCompletedOrders((prev) => [
-          { ...order, status: "delivered" },
-          ...prev,
-        ]);
+      if (order.status === "assigned") {
+        newStatus = "accepted";
+      } else if (order.status === "accepted") {
+        newStatus = "picked_up";
+      } else if (order.status === "picked_up" || order.status === "in_delivery") {
+        newStatus = "delivered";
       }
-    } catch (error) {
-      console.error("Error updating order:", error);
+      
+      if (newStatus) {
+        const success = await updateOrderStatus(order.order_id, courierId, newStatus);
+        
+        if (success) {
+          // Обновляем локальное состояние
+          if (newStatus === "delivered") {
+            // Переносим в завершённые
+            setActiveOrders((prev) => prev.filter((o) => o.id !== order.id));
+            setCompletedOrders((prev) => [
+              { ...order, status: "delivered" as OrderStatus },
+              ...prev,
+            ]);
+          } else {
+            // Обновляем статус в активных
+            setActiveOrders((prev) =>
+              prev.map((o) =>
+                o.id === order.id ? { ...o, status: newStatus as OrderStatus } : o
+              )
+            );
+          }
+        } else {
+          setError("Не удалось обновить статус заказа");
+        }
+      }
+    } catch (err) {
+      console.error("Ошибка обновления заказа:", err);
+      setError("Ошибка при обновлении заказа");
     } finally {
       setProcessingOrderId(null);
     }
   };
 
-  const getActionLabel = (status: MyOrder["status"]) => {
+  const getActionLabel = (status: OrderStatus) => {
     switch (status) {
       case "assigned": return "Забрать";
       case "accepted": return "Взять";
@@ -199,6 +138,17 @@ export default function MyOrdersPage() {
 
   const currentOrders = activeTab === "active" ? activeOrders : completedOrders;
   const totalEarnings = completedOrders.reduce((sum, o) => sum + o.earnings, 0);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A09] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-neutral-400">Загрузка заказов...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A09]">
@@ -218,6 +168,13 @@ export default function MyOrdersPage() {
           <div className="w-10" />
         </div>
       </header>
+
+      {/* Error message */}
+      {error && (
+        <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="px-4 py-3 border-b border-[#2D2A26]">
@@ -248,10 +205,10 @@ export default function MyOrdersPage() {
       </div>
 
       {/* Summary for completed */}
-      {activeTab === "completed" && (
+      {activeTab === "completed" && completedOrders.length > 0 && (
         <div className="px-4 py-3 border-b border-[#2D2A26]">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-neutral-400">Завершено за сегодня:</span>
+            <span className="text-sm text-neutral-400">Завершено:</span>
             <span className="text-lg font-bold text-white">
               {new Intl.NumberFormat("ru-RU", {
                 style: "currency",
@@ -285,7 +242,7 @@ export default function MyOrdersPage() {
                   <OrderCard
                     order={{
                       ...order.order,
-                      created_at: order.order.created_at,
+                      created_at: order.order.created_at as string,
                       delivery_distance: order.distance_km,
                     }}
                     variant={activeTab === "active" ? "active" : "completed"}

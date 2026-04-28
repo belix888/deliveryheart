@@ -1,33 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { getCourierProfileById } from "@/lib/api/couriers";
+import { useAuth } from "@/context/AuthContext";
+import type { Courier } from "@/lib/types/courier";
 import BottomNav from "@/components/courier/BottomNav";
 import { ArrowLeft, User, Phone, MapPin, Bike, Star, LogOut, Settings, HelpCircle, Shield, ChevronRight } from "lucide-react";
-
-interface CourierProfile {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  current_city: string;
-  vehicle_type: "bike" | "car" | "walk" | "scooter";
-  rating: number;
-  total_deliveries: number;
-  total_earnings: number;
-}
-
-const mockProfile: CourierProfile = {
-  id: "courier-1",
-  name: "Александр",
-  phone: "+7 999 123-45-67",
-  email: "alex@example.com",
-  current_city: "Москва",
-  vehicle_type: "bike",
-  rating: 4.8,
-  total_deliveries: 156,
-  total_earnings: 52000,
-};
 
 const vehicleLabels = {
   bike: "Велосипед",
@@ -37,7 +16,35 @@ const vehicleLabels = {
 };
 
 export default function ProfilePage() {
-  const profile = mockProfile;
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<Courier | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Загрузка профиля
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setError(null);
+        const data = await getCourierProfileById(user.id);
+        
+        if (!data) {
+          setError("Профиль не найден");
+        } else {
+          setProfile(data);
+        }
+      } catch (err) {
+        console.error("Ошибка загрузки профиля:", err);
+        setError("Не удалось загрузить профиль");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProfile();
+  }, [user?.id]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ru-RU", {
@@ -47,6 +54,33 @@ export default function ProfilePage() {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A09] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-neutral-400">Загрузка профиля...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <div className="min-h-screen bg-[#0A0A09] flex flex-col items-center justify-center p-4">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center max-w-sm">
+          <p className="text-red-400 mb-4">{error || "Профиль не найден"}</p>
+          <Link
+            href="/courier"
+            className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors"
+          >
+            На главную
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A09]">
@@ -136,7 +170,7 @@ export default function ProfilePage() {
               <Bike className="w-5 h-5 text-neutral-500" />
               <div>
                 <p className="text-xs text-neutral-500">Транспорт</p>
-                <p className="text-white">{vehicleLabels[profile.vehicle_type]}</p>
+                <p className="text-white">{vehicleLabels[profile.vehicle_type] || profile.vehicle_type}</p>
               </div>
             </div>
           </div>

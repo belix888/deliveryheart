@@ -4,92 +4,99 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  getCourierProfile,
+  getCourierProfileById,
   setCourierStatus,
   getCourierStats,
 } from "@/lib/api/couriers";
+import { useAuth } from "@/context/AuthContext";
 import type { Courier, CourierStatsSummary } from "@/lib/types/courier";
 import StatusToggle from "@/components/courier/StatusToggle";
 import QuickStats from "@/components/courier/QuickStats";
 import BottomNav from "@/components/courier/BottomNav";
 import { PackagePlus, ClipboardList, RefreshCw, Zap } from "lucide-react";
 
-// Mock data for demo - in production, get from database
-const mockCourier: Courier = {
-  id: "courier-1",
-  user_id: "user-1",
-  name: "Александр",
-  phone: "+7 999 123-45-67",
-  status: "online",
-  current_city: "Москва",
-  vehicle_type: "bike",
-  rating: 4.8,
-  total_deliveries: 156,
-  total_earnings: 45000,
-  is_active: true,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
-
-const mockStats: CourierStatsSummary = {
+const defaultStats: CourierStatsSummary = {
   today: {
-    orders_completed: 5,
-    total_earnings: 1850,
-    total_distance_km: 12.5,
+    orders_completed: 0,
+    total_earnings: 0,
+    total_distance_km: 0,
   },
   week: {
-    orders_completed: 32,
-    total_earnings: 12800,
-    total_distance_km: 85,
+    orders_completed: 0,
+    total_earnings: 0,
+    total_distance_km: 0,
   },
   month: {
-    orders_completed: 156,
-    total_earnings: 52000,
-    total_distance_km: 420,
+    orders_completed: 0,
+    total_earnings: 0,
+    total_distance_km: 0,
   },
 };
 
 export default function CourierPage() {
   const router = useRouter();
-  const [courier, setCourier] = useState<Courier | null>(mockCourier);
-  const [stats, setStats] = useState<CourierStatsSummary | null>(mockStats);
+  const { user } = useAuth();
+  const [courier, setCourier] = useState<Courier | null>(null);
+  const [stats, setStats] = useState<CourierStatsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatusLoading, setIsStatusLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Polling for real-time updates (every 30 seconds)
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // In production: get real data
-        // const profile = await getCourierProfile(userId);
-        // const statsData = await getCourierStats(courierId);
-        
-        // For demo, use mock data
-        setCourier(mockCourier);
-        setStats(mockStats);
-      } catch (error) {
-        console.error("Error fetching courier data:", error);
-      } finally {
+  // Загрузка данных курьера
+  const fetchData = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      setError(null);
+      // Получаем профиль по user_id
+      const profile = await getCourierProfileById(user.id);
+      
+      if (!profile) {
+        setError("Профиль курьера не найден");
         setIsLoading(false);
+        return;
       }
-    };
+      
+      setCourier(profile);
+      
+      // Получаем статистику
+      const statsData = await getCourierStats(profile.id);
+      setStats(statsData);
+    } catch (err) {
+      console.error("Ошибка загрузки данных курьера:", err);
+      setError("Не удалось загрузить данные. Попробуйте обновить страницу.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id]);
 
+  // Загрузка при монтировании
+  useEffect(() => {
     fetchData();
+  }, [fetchData]);
 
-    // Poll every 30 seconds
+  // Polling для обновления данных каждые 30 секунд
+  useEffect(() => {
+    if (!user?.id) return;
+    
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id, fetchData]);
 
   const handleStatusChange = async (newStatus: "online" | "offline") => {
     if (!courier) return;
     
     setIsStatusLoading(true);
     try {
-      // In production: await setCourierStatus(courier.id, newStatus);
-      setCourier({ ...courier, status: newStatus });
-    } catch (error) {
-      console.error("Error changing status:", error);
+      const success = await setCourierStatus(courier.id, newStatus);
+      if (success) {
+        setCourier({ ...courier, status: newStatus });
+      } else {
+        setError("Не удалось изменить статус");
+      }
+    } catch (err) {
+      console.error("Ошибка изменения статуса:", err);
+      setError("Ошибка при изменении статуса");
     } finally {
       setIsStatusLoading(false);
     }
@@ -114,8 +121,32 @@ export default function CourierPage() {
     );
   }
 
-  const displayCourier = courier || mockCourier;
-  const displayStats = stats || mockStats;
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center max-w-sm">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors"
+          >
+            Повторить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const displayCourier = courier;
+  const displayStats = stats || defaultStats;
+
+  if (!displayCourier) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+        <p className="text-neutral-400">Данные курьера не найдены</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-6">

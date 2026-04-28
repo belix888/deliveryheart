@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getAvailableOrders, acceptOrder } from "@/lib/api/couriers";
+import { getAvailableOrders, acceptOrder, getCourierProfileById } from "@/lib/api/couriers";
+import { useAuth } from "@/context/AuthContext";
 import OrderCard from "@/components/courier/OrderCard";
 import BottomNav from "@/components/courier/BottomNav";
 import { ArrowLeft, Filter, SlidersHorizontal, RefreshCw, Package } from "lucide-react";
@@ -24,122 +25,103 @@ interface AvailableOrder {
 
 type FilterType = "all" | "nearby" | "expensive";
 
-const mockOrders: AvailableOrder[] = [
-  {
-    id: "order-1",
-    order_number: " №1247",
-    address: "ул. Ленина, 25, кв. 14",
-    total_amount: 2450,
-    delivery_distance: 1.2,
-    created_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    restaurants: { name: "Суши Wok", address: "ул. Пушкина, 10" },
-    status: "ready",
-  },
-  {
-    id: "order-2",
-    order_number: " №1248",
-    address: "пр. Мира, 42, офис 305",
-    total_amount: 1890,
-    delivery_distance: 2.5,
-    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    restaurants: { name: "Pizza Hut", address: "ТЦ Европа" },
-    status: "ready",
-  },
-  {
-    id: "order-3",
-    order_number: " №1249",
-    address: "ул. Дворцовая, 8",
-    total_amount: 3200,
-    delivery_distance: 0.8,
-    created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    restaurants: { name: "Burger King", address: "ул. Садовая, 3" },
-    status: "ready",
-  },
-  {
-    id: "order-4",
-    order_number: " №1250",
-    address: "ул. Новая, 15, подъезд 2",
-    total_amount: 1650,
-    delivery_distance: 3.1,
-    created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-    restaurants: { name: "KFC", address: "ТЦ Грин" },
-    status: "ready",
-  },
-  {
-    id: "order-5",
-    order_number: " №1251",
-    address: "пр. Победы, 78, кв. 45",
-    total_amount: 4100,
-    delivery_distance: 1.8,
-    created_at: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-    restaurants: { name: "Якитория", address: "ул. Центральная, 12" },
-    status: "ready",
-  },
-];
-
 export default function AvailableOrdersPage() {
   const router = useRouter();
-  const [orders, setOrders] = useState<AvailableOrder[]>(mockOrders);
-  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  const [orders, setOrders] = useState<AvailableOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [courierId, setCourierId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Загрузка заказов
+  const fetchOrders = useCallback(async () => {
+    if (!courierId) return;
+    
+    try {
+      setError(null);
+      const data = await getAvailableOrders("Москва"); // TODO: получить город из профиля курьера
+      setOrders(data);
+    } catch (err) {
+      console.error("Ошибка загрузки заказов:", err);
+      setError("Не удалось загрузить заказы");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [courierId]);
+
+  // Получение ID курьера при загрузке
+  useEffect(() => {
+    const initCourier = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const profile = await getCourierProfileById(user.id);
+        if (profile) {
+          setCourierId(profile.id);
+        }
+      } catch (err) {
+        console.error("Ошибка получения профиля курьера:", err);
+        setError("Не удалось получить данные курьера");
+        setIsLoading(false);
+      }
+    };
+    
+    initCourier();
+  }, [user?.id]);
+
+  // Загрузка заказов после получения courierId
+  useEffect(() => {
+    if (courierId) {
+      fetchOrders();
+    }
+  }, [courierId, fetchOrders]);
+
+  // Polling для новых заказов каждые 30 секунд
+  useEffect(() => {
+    if (!courierId) return;
+    
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, [courierId, fetchOrders]);
 
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    try {
-      // In production: fetch from API
-      // const data = await getAvailableOrders(city);
-      // setOrders(data);
-      
-      // Simulate refresh
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    } catch (error) {
-      console.error("Error refreshing orders:", error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  // Polling for new orders (every 30 seconds)
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        // In production: get real data
-        // const data = await getAvailableOrders(city);
-        setOrders(mockOrders);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-      }
-    };
-
-    fetchOrders();
-
-    const interval = setInterval(fetchOrders, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    await fetchOrders();
+  }, [fetchOrders]);
 
   const handleAccept = async (orderId: string) => {
+    if (!courierId) {
+      setError("Данные курьера не найдены");
+      return;
+    }
+    
     setAcceptingOrderId(orderId);
     try {
-      // In production: await acceptOrder(orderId, courierId);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const success = await acceptOrder(orderId, courierId);
       
-      // Remove from list after accepting
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-      
-      // Redirect to my orders
-      router.push("/courier/orders");
-    } catch (error) {
-      console.error("Error accepting order:", error);
+      if (success) {
+        // Удаляем из списка после принятия
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        // Перенаправляем на страницу заказов
+        router.push("/courier/orders");
+      } else {
+        setError("Не удалось принять заказ. Возможно, его уже взяли.");
+      }
+    } catch (err) {
+      console.error("Ошибка принятия заказа:", err);
+      setError("Ошибка при принятии заказа");
     } finally {
       setAcceptingOrderId(null);
     }
   };
 
-  // Filter orders
+  // Фильтрация заказов
   const filteredOrders = [...orders].sort((a, b) => {
     if (filter === "nearby") {
       return (a.delivery_distance || 0) - (b.delivery_distance || 0);
@@ -149,6 +131,17 @@ export default function AvailableOrdersPage() {
     }
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A09] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-neutral-400">Загрузка заказов...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A09]">
@@ -203,6 +196,13 @@ export default function AvailableOrdersPage() {
         )}
       </header>
 
+      {/* Error message */}
+      {error && (
+        <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
+
       {/* Content */}
       <main className="p-4 pb-20">
         {/* Refresh indicator */}
@@ -210,7 +210,7 @@ export default function AvailableOrdersPage() {
           <div className="flex items-center justify-center py-4">
             <div className="flex items-center gap-2 text-neutral-400">
               <RefreshCw className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Об��овление...</span>
+              <span className="text-sm">Обновление...</span>
             </div>
           </div>
         )}

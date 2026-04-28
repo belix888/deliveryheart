@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { getCourierEarnings, getCourierStats } from "@/lib/api/couriers";
+import { getCourierEarnings, getCourierProfileById } from "@/lib/api/couriers";
+import { useAuth } from "@/context/AuthContext";
 import BottomNav from "@/components/courier/BottomNav";
 import { ArrowLeft, TrendingUp, Calendar, Wallet, Clock, ChevronRight } from "lucide-react";
 
@@ -16,23 +17,60 @@ interface DailyEarnings {
 
 type PeriodType = "daily" | "weekly" | "monthly";
 
-const mockDailyEarnings: DailyEarnings[] = [
-  { id: "e-1", courier_id: "c-1", amount: 1850, period_date: new Date().toISOString().split("T")[0], orders_count: 5 },
-  { id: "e-2", courier_id: "c-1", amount: 2200, period_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split("T")[0], orders_count: 7 },
-  { id: "e-3", courier_id: "c-1", amount: 1650, period_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], orders_count: 4 },
-  { id: "e-4", courier_id: "c-1", amount: 2800, period_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], orders_count: 8 },
-  { id: "e-5", courier_id: "c-1", amount: 1950, period_date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], orders_count: 6 },
-  { id: "e-6", courier_id: "c-1", amount: 1400, period_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], orders_count: 4 },
-  { id: "e-7", courier_id: "c-1", amount: 2350, period_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], orders_count: 7 },
-];
-
 export default function EarningsPage() {
+  const { user } = useAuth();
   const [period, setPeriod] = useState<PeriodType>("daily");
-  const [earnings, setEarnings] = useState<DailyEarnings[]>(mockDailyEarnings);
-  const [isLoading, setIsLoading] = useState(false);
+  const [earnings, setEarnings] = useState<DailyEarnings[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [courierId, setCourierId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Calculate totals
+  // Получение ID курьера
+  useEffect(() => {
+    const initCourier = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const profile = await getCourierProfileById(user.id);
+        if (profile) {
+          setCourierId(profile.id);
+        }
+      } catch (err) {
+        console.error("Ошибка получения профиля курьера:", err);
+        setError("Не удалось получить данные курьера");
+        setIsLoading(false);
+      }
+    };
+    
+    initCourier();
+  }, [user?.id]);
+
+  // Загрузка заработка
+  const fetchEarnings = useCallback(async () => {
+    if (!courierId) return;
+    
+    try {
+      setError(null);
+      const data = await getCourierEarnings(courierId, period);
+      setEarnings(data);
+    } catch (err) {
+      console.error("Ошибка загрузки заработка:", err);
+      setError("Не удалось загрузить данные о заработке");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [courierId, period]);
+
+  useEffect(() => {
+    if (courierId) {
+      fetchEarnings();
+    }
+  }, [courierId, fetchEarnings]);
+
+  // Расчёт итогов
   const calculateTotal = () => {
+    if (earnings.length === 0) return 0;
+    
     if (period === "daily") {
       return earnings[0]?.amount || 0;
     }
@@ -43,6 +81,8 @@ export default function EarningsPage() {
   };
 
   const calculateOrders = () => {
+    if (earnings.length === 0) return 0;
+    
     if (period === "daily") {
       return earnings[0]?.orders_count || 0;
     }
@@ -84,6 +124,17 @@ export default function EarningsPage() {
     }).format(amount);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A09] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-neutral-400">Загрузка данных...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0A0A09]">
       {/* Header */}
@@ -102,6 +153,13 @@ export default function EarningsPage() {
           <div className="w-10" />
         </div>
       </header>
+
+      {/* Error message */}
+      {error && (
+        <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
 
       {/* Period tabs */}
       <div className="px-4 py-3 border-b border-[#2D2A26]">
@@ -190,30 +248,36 @@ export default function EarningsPage() {
         <div className="space-y-3">
           <h2 className="text-lg font-semibold text-white">По дням</h2>
           
-          <div className="space-y-2">
-            {earnings.slice(0, period === "daily" ? 1 : period === "weekly" ? 7 : 14).map((e, index) => (
-              <div
-                key={e.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#1A1918] border border-[#2D2A26]"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#2D2A26] flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-neutral-400" />
+          {earnings.length > 0 ? (
+            <div className="space-y-2">
+              {earnings.slice(0, period === "daily" ? 1 : period === "weekly" ? 7 : 14).map((e, index) => (
+                <div
+                  key={e.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-[#1A1918] border border-[#2D2A26]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#2D2A26] flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-neutral-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{formatDate(e.period_date)}</p>
+                      <p className="text-xs text-neutral-500">{e.orders_count || 0} заказов</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-white">{formatDate(e.period_date)}</p>
-                    <p className="text-xs text-neutral-500">{e.orders_count} заказов</p>
+                  
+                  <div className="text-right">
+                    <p className="font-semibold text-white">
+                      {formatCurrency(e.amount)}
+                    </p>
                   </div>
                 </div>
-                
-                <div className="text-right">
-                  <p className="font-semibold text-white">
-                    {formatCurrency(e.amount)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-neutral-500">
+              <p>Нет данных за этот период</p>
+            </div>
+          )}
         </div>
       </div>
 
