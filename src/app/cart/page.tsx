@@ -97,14 +97,16 @@ const CartPage: React.FC = () => {
         order_number: orderNumber,
         user_id: user.id,
         restaurant_id: restaurant.id,
-        delivery_address_id: addressId,
+        delivery_address_id: addressId || null,
         total_amount: total,
         delivery_price: deliveryPrice,
         final_amount: total + deliveryPrice,
         status: 'pending',
       };
-
+      
       console.log('Creating order with data:', orderData);
+      console.log('user.id:', user.id);
+      console.log('restaurant.id:', restaurant.id);
       
       const order = await createOrder(orderData);
       

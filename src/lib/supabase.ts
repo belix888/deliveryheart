@@ -187,7 +187,7 @@ export const createOrder = async (orderData: {
   final_amount: number;
   comment?: string;
 }) => {
-  console.log('createOrder called with:', orderData);
+  console.log('createOrder called with:', JSON.stringify(orderData, null, 2));
   
   const { data, error } = await supabase
     .from('orders')
@@ -196,7 +196,7 @@ export const createOrder = async (orderData: {
     .single();
   
   if (error) {
-    console.error('Error creating order:', error);
+    console.error('Error creating order:', JSON.stringify(error, null, 2));
     return null;
   }
   return data;
