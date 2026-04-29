@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -25,8 +25,11 @@ import {
   ChevronRight,
   Package,
   Bike,
+  LogOut,
+  Lock,
 } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
+import { supabase } from "@/lib/supabase";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Дашборд", href: "/admin" },
