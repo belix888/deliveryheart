@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { fetchRestaurants, fetchFavorites, ensureDemoUser, Restaurant } from "@/lib/supabase";
+import { supabase, fetchRestaurants, fetchFavorites, Restaurant } from "@/lib/supabase";
 import RestaurantCard from "@/components/RestaurantCard";
 
 const FavoritesPage: React.FC = () => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [needsAuth, setNeedsAuth] = useState(false);
 
   useEffect(() => {
     loadFavorites();
@@ -14,14 +15,21 @@ const FavoritesPage: React.FC = () => {
 
   const loadFavorites = async () => {
     setLoading(true);
-    const user = await ensureDemoUser();
-    if (user) {
-      const favs = await fetchFavorites(user.id);
-      setRestaurants(favs);
-    } else {
-      // If no user, just show random restaurants as favorites
-      const all = await fetchRestaurants();
-      setRestaurants(all.slice(0, 4));
+    try {
+      // Try to get any user from users table (for demo access)
+      const { data: users } = await supabase.from('users').select('*').limit(1).single();
+      
+      if (users) {
+        const favs = await fetchFavorites(users.id);
+        setRestaurants(favs);
+        setNeedsAuth(false);
+      } else {
+        // No user found - need to login
+        setNeedsAuth(true);
+        setRestaurants([]);
+      }
+    } catch {
+      setNeedsAuth(true);
     }
     setLoading(false);
   };

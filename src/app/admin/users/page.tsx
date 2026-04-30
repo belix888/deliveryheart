@@ -53,45 +53,14 @@ export default function UsersPage() {
       setIsLoading(true);
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
+const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.user) {
-        // For demo, use mock data
-        setUsers([
-          {
-            id: "user-1",
-            email: "admin@example.com",
-            created_at: new Date().toISOString(),
-            roles: [{ id: "role-admin", name: "admin", display_name: "Администратор", restaurant_id: null, restaurant_name: null, is_active: true }],
-          },
-          {
-            id: "user-2",
-            email: "owner@restaurant.ru",
-            created_at: new Date().toISOString(),
-            roles: [{ id: "role-owner", name: "restaurant_owner", display_name: "Владелец ресторана", restaurant_id: "rest-1", restaurant_name: "Пельменная", is_active: true }],
-          },
-          {
-            id: "user-3",
-            email: "courier@delivery.ru",
-            created_at: new Date().toISOString(),
-            roles: [{ id: "role-courier", name: "courier", display_name: "Курьер", restaurant_id: null, restaurant_name: null, is_active: true }],
-          },
-        ]);
-        setRoles([
-          { id: "role-admin", name: "admin", display_name: "Администратор" },
-          { id: "role-owner", name: "restaurant_owner", display_name: "Владелец ресторана" },
-          { id: "role-manager", name: "restaurant_admin", display_name: "Админ ресторана" },
-          { id: "role-courier", name: "courier", display_name: "Курьер" },
-          { id: "role-client", name: "client", display_name: "Клиент" },
-        ]);
-        setRestaurants([
-          { id: "rest-1", name: "Пельменная" },
-          { id: "rest-2", name: "Burger King" },
-          { id: "rest-3", name: "KFC" },
-        ]);
+        setError("Требуется авторизация для просмотра пользователей");
+        setIsLoading(false);
         return;
       }
-
+      
       // Real API call
       const response = await fetch('/api/admin/users', {
         headers: {
