@@ -26,7 +26,7 @@ export interface RestaurantOrder {
   final_amount: number;
   created_at: string;
   updated_at: string | null;
-  status_history: any;
+  status_history: StatusHistory[];
   client_name?: string;
   client_phone?: string;
   courier_id?: string;

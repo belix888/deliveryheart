@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Plus, Check } from "lucide-react";
-import { MenuItem } from "@/lib/supabase";
+import { MenuItem, Restaurant } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { getDishEmoji, getDishPlaceholderStyle } from "@/lib/images";
@@ -41,7 +41,7 @@ const DishCard: React.FC<DishCardProps> = ({ dish, restaurant }) => {
       price: Number(dish.price),
       image: dish.image_url || '',
       category: '',
-    }, restaurant || null);
+    }, restaurant as any);
     setTimeout(() => setIsAdding(false), 400);
   };
 
