@@ -1,308 +1,348 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 import {
   ShoppingCart,
   Users,
   DollarSign,
   TrendingUp,
-  TrendingDown,
-  Star,
-  Clock,
   Package,
+  Store,
+  Truck,
+  Clock,
+  Loader2,
   AlertCircle,
 } from "lucide-react";
 
-const stats = [
-  {
-    title: "Заказы сегодня",
-    value: "47",
-    change: "+12%",
-    isPositive: true,
-    icon: ShoppingCart,
-    color: "primary",
-  },
-  {
-    title: "Выручка сегодня",
-    value: "32 450 ₽",
-    change: "+8%",
-    isPositive: true,
-    icon: DollarSign,
-    color: "green",
-  },
-  {
-    title: "Новые пользователи",
-    value: "12",
-    change: "+25%",
-    isPositive: true,
-    icon: Users,
-    color: "blue",
-  },
-  {
-    title: "Средний чек",
-    value: "690 ₽",
-    change: "-3%",
-    isPositive: false,
-    icon: TrendingUp,
-    color: "orange",
-  },
-];
-
-const recentOrders = [
-  { id: "#2847", restaurant: "Пельменная №1", user: "Анна К.", total: 1250, status: "preparing" },
-  { id: "#2846", restaurant: "Sushi Master", user: "Иван П.", total: 2340, status: "delivering" },
-  { id: "#2845", restaurant: "Pizza Napoli", user: "Мария С.", total: 890, status: "delivered" },
-  { id: "#2844", restaurant: "Burger House", user: "Алексей Д.", total: 1560, status: "pending" },
-  { id: "#2843", restaurant: "Пельменная №1", user: "Елена В.", total: 780, status: "delivered" },
-];
-
-const topRestaurants = [
-  { name: "Пельменная №1", orders: 145, rating: 4.8 },
-  { name: "Sushi Master", orders: 98, rating: 4.9 },
-  { name: "Pizza Napoli", orders: 87, rating: 4.7 },
-  { name: "Burger House", orders: 76, rating: 4.6 },
-];
-
-const topDishes = [
-  { name: "Пельмени классические", restaurant: "Пельменная №1", orders: 234 },
-  { name: "Филадельфия", restaurant: "Sushi Master", orders: 189 },
-  { name: "Маргарита", restaurant: "Pizza Napoli", orders: 156 },
-  { name: "Классический бургер", restaurant: "Burger House", orders: 134 },
-];
-
-const notifications = [
-  { type: "order", text: "Новый заказ #2848 от Петра А.", time: "2 мин назад" },
-  { type: "review", text: "Новый отзыв на ресторан Pizza Napoli", time: "15 мин назад" },
-  { type: "alert", text: "Заканчиваются ингредиенты в Sushi Master", time: "1 час назад" },
-];
-
 const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
-    pending: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-    confirmed: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    preparing: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-    ready: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    delivering: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-    delivered: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+    pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    confirmed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    preparing: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+    ready: "bg-green-500/20 text-green-400 border-green-500/30",
+    waiting_courier: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    in_delivery: "bg-primary/20 text-primary border-primary/30",
+    delivered: "bg-green-500/20 text-green-400 border-green-500/30",
+    cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
   };
-  return colors[status] || colors.pending;
+  return colors[status] || "bg-gray-500/20 text-gray-400";
 };
 
-const AdminDashboard: React.FC = () => {
-  const [timeRange, setTimeRange] = useState("week");
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    pending: "Новый",
+    confirmed: "Подтверждён",
+    preparing: "Готовится",
+    ready: "Готов",
+    waiting_courier: "Ждёт курьера",
+    in_delivery: "В доставке",
+    delivered: "Доставлен",
+    cancelled: "Отменён",
+  };
+  return labels[status] || status;
+};
+
+export default function AdminDashboard() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [couriers, setCouriers] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const today = new Date().toISOString().split("T")[0];
+
+      // Заказы за сегодня
+      const { data: allOrders } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      // Рестораны
+      const { data: allRestaurants } = await supabase
+        .from("restaurants")
+        .select("id, name, is_available")
+        .order("created_at", { ascending: false });
+
+      // Курьеры
+      const { data: allCouriers } = await supabase
+        .from("couriers")
+        .select("id, name, status, total_deliveries");
+
+      // Пользователи
+      const { data: authUsers } = await supabase.auth.admin.listUsers();
+
+      setOrders(allOrders || []);
+      setRestaurants(allRestaurants || []);
+      setCouriers(allCouriers || []);
+      setUsers(authUsers?.users || []);
+    } catch (err: any) {
+      console.error("[Dashboard] Error:", err);
+      setError(err.message || "Ошибка загрузки данных");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Рассчитай статистику
+  const today = new Date().toISOString().split("T")[0];
+  const todayOrders = orders.filter((o) => o.created_at?.startsWith(today));
+  const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.final_amount || 0), 0);
+  const avgCheck = todayOrders.length > 0 ? Math.round(todayRevenue / todayOrders.length) : 0;
+
+  const activeRestaurants = restaurants.filter((r) => r.is_available).length;
+  const onlineCouriers = couriers.filter((c) => c.status === "online").length;
+
+  const stats = [
+    {
+      title: "Заказы сегодня",
+      value: todayOrders.length.toString(),
+      change: "+12%",
+      isPositive: true,
+      icon: ShoppingCart,
+      color: "from-primary to-primary/80",
+      bg: "bg-primary/10",
+    },
+    {
+      title: "Выручка сегодня",
+      value: `${todayRevenue.toLocaleString("ru-RU")} ₽`,
+      change: "+8%",
+      isPositive: true,
+      icon: DollarSign,
+      color: "from-green-500 to-green-600",
+      bg: "bg-green-500/10",
+    },
+    {
+      title: "Новые пользователи",
+      value: users.length.toString(),
+      change: "+25%",
+      isPositive: true,
+      icon: Users,
+      color: "from-blue-500 to-blue-600",
+      bg: "bg-blue-500/10",
+    },
+    {
+      title: "Средний чек",
+      value: `${avgCheck.toLocaleString("ru-RU")} ₽`,
+      change: "-3%",
+      isPositive: false,
+      icon: TrendingUp,
+      color: "from-amber-500 to-orange-600",
+      bg: "bg-amber-500/10",
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+        <div className="flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-400" />
+          <p className="text-red-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="animate-fade-in">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="space-y-6">
+      {/* Статистика */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
-          const colorClasses: Record<string, string> = {
-            primary: "bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark",
-            green: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
-            blue: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-            orange: "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
-          };
-          
           return (
             <div
               key={index}
-              className="bg-white dark:bg-[#2D2A26] rounded-2xl p-5 border border-[#F5F3F0] dark:border-[#3D3A36]"
+              className="p-5 rounded-2xl bg-[#111111] border border-[#222222] hover:border-[#333333] transition-all"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={`p-2.5 rounded-xl ${colorClasses[stat.color]}`}>
-                  <Icon className="w-5 h-5" />
+                <div className={`p-2.5 rounded-xl ${stat.bg}`}>
+                  <Icon className="w-5 h-5 text-primary" />
                 </div>
-                <div className={`flex items-center gap-1 text-sm ${stat.isPositive ? "text-green-600" : "text-red-600"}`}>
-                  {stat.isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                <span
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    stat.isPositive
+                      ? "bg-green-500/20 text-green-400"
+                      : "bg-red-500/20 text-red-400"
+                  }`}
+                >
                   {stat.change}
-                </div>
+                </span>
               </div>
-              <p className="text-2xl font-bold text-[#2D2A26] dark:text-[#E8E6E3] mb-1">{stat.value}</p>
-              <p className="text-sm text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">{stat.title}</p>
+              <p className="text-2xl font-bold text-white mb-1">{stat.value}</p>
+              <p className="text-sm text-gray-400">{stat.title}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Orders Chart */}
-        <div className="bg-white dark:bg-[#2D2A26] rounded-2xl p-5 border border-[#F5F3F0] dark:border-[#3D3A36]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold text-lg">Заказы</h3>
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-[#F5F3F0] dark:bg-[#3D3A36] text-sm"
-            >
-              <option value="week">За неделю</option>
-              <option value="month">За месяц</option>
-              <option value="year">За год</option>
-            </select>
+      {/* Быстрые действия */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link
+          href="/admin/orders"
+          className="p-5 rounded-2xl bg-[#111111] border border-[#222222] hover:border-[#333333] transition-all flex items-center gap-4"
+        >
+          <div className="p-3 rounded-xl bg-blue-500/10">
+            <Package className="w-6 h-6 text-blue-400" />
           </div>
-          <div className="h-48 flex items-end justify-between gap-2">
-            {[65, 45, 78, 52, 89, 67, 75].map((height, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full bg-primary/20 dark:bg-primary-dark/20 rounded-t-lg relative group cursor-pointer"
-                  style={{ height: `${height * 2}px` }}
-                >
-                  <div className="absolute bottom-0 left-0 right-0 bg-primary dark:bg-primary-dark rounded-t-lg transition-all group-hover:opacity-80" style={{ height: `${height * 1.5}px` }} />
-                </div>
-                <span className="text-xs text-[#2D2A26]/50 dark:text-[#E8E6E3]/50">
-                  {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][i]}
-                </span>
-              </div>
-            ))}
+          <div>
+            <p className="text-lg font-semibold text-white">
+              {orders.filter((o) => o.status === "pending").length}
+            </p>
+            <p className="text-sm text-gray-400">Новых заказов</p>
           </div>
-        </div>
+        </Link>
 
-        {/* Revenue Chart */}
-        <div className="bg-white dark:bg-[#2D2A26] rounded-2xl p-5 border border-[#F5F3F0] dark:border-[#3D3A36]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold text-lg">Выручка</h3>
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-[#F5F3F0] dark:bg-[#3D3A36] text-sm"
-            >
-              <option value="week">За неделю</option>
-              <option value="month">За месяц</option>
-              <option value="year">За год</option>
-            </select>
+        <Link
+          href="/admin/restaurants"
+          className="p-5 rounded-2xl bg-[#111111] border border-[#222222] hover:border-[#333333] transition-all flex items-center gap-4"
+        >
+          <div className="p-3 rounded-xl bg-green-500/10">
+            <Store className="w-6 h-6 text-green-400" />
           </div>
-          <div className="h-48 flex items-end justify-between gap-2">
-            {[45, 62, 38, 75, 58, 82, 69].map((height, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full bg-green-100 dark:bg-green-900/30 rounded-t-lg relative group cursor-pointer"
-                  style={{ height: `${height * 2}px` }}
-                >
-                  <div className="absolute bottom-0 left-0 right-0 bg-green-500 rounded-t-lg transition-all group-hover:opacity-80" style={{ height: `${height * 1.5}px` }} />
-                </div>
-                <span className="text-xs text-[#2D2A26]/50 dark:text-[#E8E6E3]/50">
-                  {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][i]}
-                </span>
-              </div>
-            ))}
+          <div>
+            <p className="text-lg font-semibold text-white">
+              {activeRestaurants}/{restaurants.length}
+            </p>
+            <p className="text-sm text-gray-400">Ресторанов</p>
           </div>
-        </div>
+        </Link>
+
+        <Link
+          href="/admin/couriers"
+          className="p-5 rounded-2xl bg-[#111111] border border-[#222222] hover:border-[#333333] transition-all flex items-center gap-4"
+        >
+          <div className="p-3 rounded-xl bg-purple-500/10">
+            <Truck className="w-6 h-6 text-purple-400" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-white">{onlineCouriers}</p>
+            <p className="text-sm text-gray-400">Курьеров онлайн</p>
+          </div>
+        </Link>
       </div>
 
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Orders */}
-        <div className="bg-white dark:bg-[#2D2A26] rounded-2xl p-5 border border-[#F5F3F0] dark:border-[#3D3A36]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold text-lg">Последние заказы</h3>
-            <Link href="/admin/orders" className="text-sm text-primary dark:text-primary-dark hover:opacity-80">
-              Все →
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {recentOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between py-2 border-b border-[#F5F3F0] dark:border-[#3D3A36] last:border-0">
-                <div>
-                  <p className="font-semibold text-sm">{order.id}</p>
-                  <p className="text-xs text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">{order.restaurant}</p>
-                </div>
-                <div className="text-right">
-                  <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
-                    {order.status === "pending" && "Новый"}
-                    {order.status === "preparing" && "Готовится"}
-                    {order.status === "delivering" && "В пути"}
-                    {order.status === "delivered" && "Доставлен"}
-                  </span>
-                  <p className="text-sm font-semibold mt-1">{order.total} ₽</p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Последние заказы */}
+      <div className="rounded-2xl bg-[#111111] border border-[#222222] overflow-hidden">
+        <div className="p-4 border-b border-[#222222] flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Последние заказы</h2>
+          <Link href="/admin/orders" className="text-sm text-primary hover:underline">
+            Смотреть все →
+          </Link>
         </div>
 
-        {/* Top Restaurants */}
-        <div className="bg-white dark:bg-[#2D2A26] rounded-2xl p-5 border border-[#F5F3F0] dark:border-[#3D3A36]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold text-lg">Топ ресторанов</h3>
-            <Link href="/admin/restaurants" className="text-sm text-primary dark:text-primary-dark hover:opacity-80">
-              Все →
-            </Link>
+        {orders.length === 0 ? (
+          <div className="p-8 text-center text-gray-400">
+            <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>Пока нет заказов</p>
           </div>
-          <div className="space-y-3">
-            {topRestaurants.map((restaurant, index) => (
-              <div key={index} className="flex items-center justify-between py-2 border-b border-[#F5F3F0] dark:border-[#3D3A36] last:border-0">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-primary/10 dark:bg-primary-dark/10 flex items-center justify-center text-xs font-bold text-primary dark:text-primary-dark">
-                    {index + 1}
-                  </span>
+        ) : (
+          <div className="divide-y divide-[#222222]">
+            {orders.slice(0, 5).map((order) => (
+              <div
+                key={order.id}
+                className="p-4 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#1a1a1a] flex items-center justify-center">
+                    <Package className="w-5 h-5 text-gray-400" />
+                  </div>
                   <div>
-                    <p className="font-semibold text-sm">{restaurant.name}</p>
-                    <p className="text-xs text-[#2D2A26]/60 dark:text-[#E8E6E3]/60">{restaurant.orders} заказов</p>
+                    <p className="font-medium text-white">
+                      #{order.order_number || order.id.slice(0, 8)}
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      {new Date(order.created_at).toLocaleString("ru-RU", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Star className="w-4 h-4 text-yellow-500" fill="#FFD700" />
-                  <span className="text-sm font-semibold">{restaurant.rating}</span>
+                <div className="flex items-center gap-4">
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(
+                      order.status
+                    )}`}
+                  >
+                    {getStatusLabel(order.status)}
+                  </span>
+                  <span className="text-white font-semibold">
+                    {order.final_amount?.toLocaleString("ru-RU") || 0} ₽
+                  </span>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Notifications */}
-        <div className="bg-white dark:bg-[#2D2A26] rounded-2xl p-5 border border-[#F5F3F0] dark:border-[#3D3A36]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold text-lg">Уведомления</h3>
-          </div>
-          <div className="space-y-3">
-            {notifications.map((notification, index) => (
-              <div key={index} className="flex items-start gap-3 py-2 border-b border-[#F5F3F0] dark:border-[#3D3A36] last:border-0">
-                <div className={`p-2 rounded-lg ${
-                  notification.type === "order" ? "bg-primary/10 text-primary" :
-                  notification.type === "review" ? "bg-yellow-100 text-yellow-600" :
-                  "bg-red-100 text-red-600"
-                }`}>
-                  {notification.type === "order" && <Package className="w-4 h-4" />}
-                  {notification.type === "review" && <Star className="w-4 h-4" />}
-                  {notification.type === "alert" && <AlertCircle className="w-4 h-4" />}
-                </div>
-                <div>
-                  <p className="text-sm">{notification.text}</p>
-                  <p className="text-xs text-[#2D2A26]/50 dark:text-[#E8E6E3]/50 mt-1">{notification.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Top Dishes */}
-      <div className="mt-6 bg-white dark:bg-[#2D2A26] rounded-2xl p-5 border border-[#F5F3F0] dark:border-[#3D3A36]">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-semibold text-lg">Популярные блюда</h3>
+      {/* Топ ресторанов */}
+      <div className="rounded-2xl bg-[#111111] border border-[#222222] overflow-hidden">
+        <div className="p-4 border-b border-[#222222] flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Рестораны</h2>
+          <Link
+            href="/admin/restaurants"
+            className="text-sm text-primary hover:underline"
+          >
+            Смотреть все →
+          </Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {topDishes.map((dish, index) => (
-            <div key={index} className="p-4 bg-[#F5F3F0] dark:bg-[#3D3A36] rounded-xl">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="w-8 h-8 rounded-full bg-primary/20 dark:bg-primary-dark/20 flex items-center justify-center text-sm font-bold text-primary dark:text-primary-dark">
-                  {index + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate">{dish.name}</p>
-                  <p className="text-xs text-[#2D2A26]/60 dark:text-[#E8E6E3]/60 truncate">{dish.restaurant}</p>
+
+        {restaurants.length === 0 ? (
+          <div className="p-8 text-center text-gray-400">
+            <Store className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>Пока нет ресторанов</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#222222]">
+            {restaurants.slice(0, 5).map((restaurant) => (
+              <div
+                key={restaurant.id}
+                className="p-4 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#1a1a1a] flex items-center justify-center">
+                    <Store className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">{restaurant.name}</p>
+                    <p className="text-sm text-gray-400">
+                      ID: {restaurant.id.slice(0, 8)}
+                    </p>
+                  </div>
                 </div>
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    restaurant.is_available ? "bg-green-500" : "bg-gray-500"
+                  }`}
+                />
               </div>
-              <p className="text-lg font-bold text-primary dark:text-primary-dark">{dish.orders} заказов</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default AdminDashboard;
+}
